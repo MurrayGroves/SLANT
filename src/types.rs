@@ -75,11 +75,13 @@ impl<
 
 #[derive(Clone)]
 pub struct GlobalStateManager<
+    'a,
     NodeBehaviourType: NodeBehaviour<A, K>,
     MoveBehaviourType: MoveBehaviour<A, K>,
     A: kiddo::float::kdtree::Axis,
     const K: usize,
 > {
+    pub sim_manager: &'a SimManager<'a, NodeBehaviourType, MoveBehaviourType, A, K>,
     nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>>,
     /// 32 is the bucket size, might be worth profiling different values (see https://github.com/sdd/kiddo/blob/20560517c7e06d71a6887a7662b89b70091ef8db/examples/cities.rs#L96)
     tree: ImmutableKdTree<A, u32, K, 32>,
@@ -90,7 +92,7 @@ impl<
     MoveBehaviourType: MoveBehaviour<A, K>,
     A: kiddo::float::kdtree::Axis,
     const K: usize,
-> GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>
+> GlobalStateManager<'_, NodeBehaviourType, MoveBehaviourType, A, K>
 {
     fn tick(self) -> Self {
         let mut new = self.clone();
@@ -114,13 +116,14 @@ impl<
     }
 }
 
-struct SimManager<
+pub struct SimManager<
+    'a,
     NodeBehaviourType: NodeBehaviour<A, K>,
     MoveBehaviourType: MoveBehaviour<A, K>,
     A: kiddo::float::kdtree::Axis,
     const K: usize,
 > {
-    global_state_manager: GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
+    global_state_manager: GlobalStateManager<'a, NodeBehaviourType, MoveBehaviourType, A, K>,
     rngs: Vec<UnsafeCell<Xoshiro256Plus>>,
 }
 
@@ -129,7 +132,7 @@ impl<
     MoveBehaviourType: MoveBehaviour<A, K>,
     A: kiddo::float::kdtree::Axis,
     const K: usize,
-> SimManager<NodeBehaviourType, MoveBehaviourType, A, K>
+> SimManager<'_, NodeBehaviourType, MoveBehaviourType, A, K>
 {
     /// `id` must be a unique ID for the behaviour accessing the method. Ensures reproducibility.
     pub fn get_random_range(&self, id: usize, min: A, max: A) -> A {

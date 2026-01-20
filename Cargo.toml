@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 kiddo = "5.2.4"
 rand_xoshiro = "0.7.0"
+num-traits = "0.2.19"

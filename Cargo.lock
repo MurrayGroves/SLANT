@@ -177,6 +177,7 @@ name = "manetsim"
 version = "0.1.0"
 dependencies = [
  "kiddo",
+ "num-traits",
  "rand_xoshiro",
 ]
 
