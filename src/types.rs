@@ -1,10 +1,15 @@
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
+use rand_xoshiro::Xoshiro256Plus;
+use rand_xoshiro::rand_core::RngCore;
+use std::cell::UnsafeCell;
 
 /// Describes a node behaviour which performs some processing each tick to produce a new node behaviour
 pub trait NodeBehaviour<A: kiddo::float::kdtree::Axis, const K: usize>
 where
     Self: Sized + Send + Clone,
 {
+    fn id(&self) -> usize;
+
     fn tick(
         self,
         global_state_manager: &GlobalStateManager<Self, impl MoveBehaviour<A, K>, A, K>,
@@ -15,6 +20,8 @@ pub trait MoveBehaviour<A: kiddo::float::kdtree::Axis, const K: usize>
 where
     Self: Sized + Send + Clone,
 {
+    fn id(&self) -> usize;
+
     fn tick(
         self,
         global_state_manager: &GlobalStateManager<impl NodeBehaviour<A, K>, Self, A, K>,
@@ -104,5 +111,36 @@ impl<
 
         new_2.nodes = nodes;
         new_2
+    }
+}
+
+struct SimManager<
+    NodeBehaviourType: NodeBehaviour<A, K>,
+    MoveBehaviourType: MoveBehaviour<A, K>,
+    A: kiddo::float::kdtree::Axis,
+    const K: usize,
+> {
+    global_state_manager: GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
+    rngs: Vec<UnsafeCell<Xoshiro256Plus>>,
+}
+
+impl<
+    NodeBehaviourType: NodeBehaviour<A, K>,
+    MoveBehaviourType: MoveBehaviour<A, K>,
+    A: kiddo::float::kdtree::Axis,
+    const K: usize,
+> SimManager<NodeBehaviourType, MoveBehaviourType, A, K>
+{
+    /// `id` must be a unique ID for the behaviour accessing the method. Ensures reproducibility.
+    pub fn get_random_range(&self, id: usize, min: A, max: A) -> A {
+        // Assumes RNGs initialised for all initialised IDs!
+        let int = unsafe {
+            let cell: *const UnsafeCell<Xoshiro256Plus> = &self.rngs[id];
+            let rng = UnsafeCell::raw_get(cell);
+            rng.as_mut().unwrap().next_u64()
+        };
+
+        // TODO - Verify distribution
+        (A::from(int).unwrap() % (max - min)) + min
     }
 }
