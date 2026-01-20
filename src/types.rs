@@ -3,7 +3,7 @@ use kiddo::immutable::float::kdtree::ImmutableKdTree;
 /// Describes a node behaviour which performs some processing each tick to produce a new node behaviour
 pub trait NodeBehaviour<A: kiddo::float::kdtree::Axis, const K: usize>
 where
-    Self: Sized + Send,
+    Self: Sized + Send + Clone,
 {
     fn tick(
         self,
@@ -13,7 +13,7 @@ where
 
 pub trait MoveBehaviour<A: kiddo::float::kdtree::Axis, const K: usize>
 where
-    Self: Sized + Send,
+    Self: Sized + Send + Clone,
 {
     fn tick(
         self,
@@ -22,6 +22,7 @@ where
     ) -> (Self, [A; K]);
 }
 
+#[derive(Clone)]
 struct Node<
     NodeBehaviourType: NodeBehaviour<A, K>,
     MoveBehaviourType: MoveBehaviour<A, K>,
@@ -33,6 +34,39 @@ struct Node<
     position: [A; K],
 }
 
+impl<
+    NodeBehaviourType: NodeBehaviour<A, K>,
+    MoveBehaviourType: MoveBehaviour<A, K>,
+    A: kiddo::float::kdtree::Axis,
+    const K: usize,
+> Node<NodeBehaviourType, MoveBehaviourType, A, K>
+{
+    fn tick_behaviour(
+        self,
+        global_state_manager: &GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
+    ) -> Self {
+        Self {
+            behaviour: self.behaviour.tick(global_state_manager),
+            move_behaviour: self.move_behaviour,
+            position: self.position,
+        }
+    }
+
+    fn tick_movement(
+        self,
+        global_state_manager: &GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
+    ) -> Self {
+        let mut new = self.clone();
+        let (move_behaviour, position) = self
+            .move_behaviour
+            .tick(global_state_manager, self.position);
+        new.move_behaviour = move_behaviour;
+        new.position = position;
+        new
+    }
+}
+
+#[derive(Clone)]
 pub struct GlobalStateManager<
     NodeBehaviourType: NodeBehaviour<A, K>,
     MoveBehaviourType: MoveBehaviour<A, K>,
@@ -52,6 +86,23 @@ impl<
 > GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>
 {
     fn tick(self) -> Self {
-        todo!()
+        let mut new = self.clone();
+        let nodes = new
+            .nodes
+            .into_iter()
+            .map(|x| x.tick_movement(&self))
+            .collect();
+
+        new.nodes = nodes;
+
+        let mut new_2 = new.clone();
+        let nodes = new_2
+            .nodes
+            .into_iter()
+            .map(|x| x.tick_behaviour(&new))
+            .collect();
+
+        new_2.nodes = nodes;
+        new_2
     }
 }
