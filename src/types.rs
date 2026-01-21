@@ -12,7 +12,7 @@ where
 {
     fn tick(
         self,
-        id: NodeID,
+        node_data: &NodeData<A, K>,
         global_state_manager: &GlobalStateManager<Self, impl MoveBehaviour<A, K>, A, K>,
         incoming_packets: &Vec<Box<dyn Packet>>,
     ) -> Self;
@@ -24,9 +24,8 @@ where
 {
     fn tick(
         self,
-        id: NodeID,
+        data: &NodeData<A, K>,
         global_state_manager: &GlobalStateManager<impl NodeBehaviour<A, K>, Self, A, K>,
-        position: [A; K],
     ) -> (Self, [A; K]);
 }
 
@@ -66,8 +65,13 @@ struct Node<
 > {
     behaviour: NodeBehaviourType,
     move_behaviour: MoveBehaviourType,
-    position: [A; K],
-    id: NodeID,
+    data: NodeData<A, K>,
+}
+
+#[derive(Clone)]
+pub struct NodeData<A: kiddo::float::kdtree::Axis, const K: usize> {
+    pub position: [A; K],
+    pub id: NodeID,
 }
 
 impl<
@@ -83,12 +87,11 @@ impl<
         incoming_packets: &Vec<Box<dyn Packet>>,
     ) -> Self {
         Self {
-            id: self.id,
             behaviour: self
                 .behaviour
-                .tick(self.id, global_state_manager, incoming_packets),
+                .tick(&self.data, global_state_manager, incoming_packets),
+            data: self.data,
             move_behaviour: self.move_behaviour,
-            position: self.position,
         }
     }
 
@@ -97,11 +100,11 @@ impl<
         global_state_manager: &GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
     ) -> Self {
         let mut new = self.clone();
-        let (move_behaviour, position) =
-            self.move_behaviour
-                .tick(self.id, global_state_manager, self.position);
+        let (move_behaviour, position) = self.move_behaviour.tick(&self.data, global_state_manager);
         new.move_behaviour = move_behaviour;
-        new.position = position;
+        let mut data = self.data;
+        data.position = position;
+        new.data = data;
         new
     }
 }
@@ -141,7 +144,7 @@ impl<
         let nodes = nodes
             .into_iter()
             .map(|x| {
-                let packets = self.incoming_packets.get(&x.id).unwrap();
+                let packets = self.incoming_packets.get(&x.data.id).unwrap();
                 x.tick_behaviour(&self, packets)
             })
             .collect();
@@ -157,6 +160,10 @@ impl<
                 .collect(),
             new_packets: HashMap::new(), // TODO - instantiate for each ID
         }
+    }
+
+    pub fn transmit_packet(&self, transmitter: &NodeData<A, K>) {
+        // TODO
     }
 }
 
