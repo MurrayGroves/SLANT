@@ -1,4 +1,4 @@
-use crate::types::{GlobalStateManager, MoveBehaviour, NodeBehaviour};
+use crate::types::{GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeID};
 use num_traits::Float;
 
 #[derive(Clone)]
@@ -19,12 +19,9 @@ impl<
     const K: usize,
 > MoveBehaviour<A, K> for RandomWalk<CHANGE_DELAY, A, K>
 {
-    fn id(&self) -> usize {
-        todo!()
-    }
-
     fn tick(
         self,
+        id: NodeID,
         global_state_manager: &GlobalStateManager<impl NodeBehaviour<A, K>, Self, A, K>,
         mut position: [A; K],
     ) -> (Self, [A; K]) {
@@ -32,7 +29,7 @@ impl<
         if self.tick_counter % CHANGE_DELAY == 0 {
             for i in 0..K {
                 let val = global_state_manager.sim_manager.get_random_range(
-                    self.id(),
+                    id,
                     A::from(-1.0).unwrap(),
                     A::from(1.0).unwrap(),
                 );

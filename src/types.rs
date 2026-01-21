@@ -2,17 +2,19 @@ use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use rand_xoshiro::Xoshiro256Plus;
 use rand_xoshiro::rand_core::RngCore;
 use std::cell::UnsafeCell;
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 /// Describes a node behaviour which performs some processing each tick to produce a new node behaviour
 pub trait NodeBehaviour<A: kiddo::float::kdtree::Axis, const K: usize>
 where
     Self: Sized + Send + Clone,
 {
-    fn id(&self) -> usize;
-
     fn tick(
         self,
+        id: NodeID,
         global_state_manager: &GlobalStateManager<Self, impl MoveBehaviour<A, K>, A, K>,
+        incoming_packets: &Vec<Box<dyn Packet>>,
     ) -> Self;
 }
 
@@ -20,13 +22,39 @@ pub trait MoveBehaviour<A: kiddo::float::kdtree::Axis, const K: usize>
 where
     Self: Sized + Send + Clone,
 {
-    fn id(&self) -> usize;
-
     fn tick(
         self,
+        id: NodeID,
         global_state_manager: &GlobalStateManager<impl NodeBehaviour<A, K>, Self, A, K>,
         position: [A; K],
     ) -> (Self, [A; K]);
+}
+
+pub type NodeID = usize;
+
+struct UnicastPacket {
+    target: NodeID,
+    content: Box<[u8]>,
+}
+
+impl Packet for UnicastPacket {
+    fn content(self) -> Box<[u8]> {
+        self.content
+    }
+}
+
+struct MulticastPacket {
+    content: Box<[u8]>,
+}
+
+impl Packet for MulticastPacket {
+    fn content(self) -> Box<[u8]> {
+        self.content
+    }
+}
+
+pub trait Packet {
+    fn content(self) -> Box<[u8]>;
 }
 
 #[derive(Clone)]
@@ -39,6 +67,7 @@ struct Node<
     behaviour: NodeBehaviourType,
     move_behaviour: MoveBehaviourType,
     position: [A; K],
+    id: NodeID,
 }
 
 impl<
@@ -51,9 +80,13 @@ impl<
     fn tick_behaviour(
         self,
         global_state_manager: &GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
+        incoming_packets: &Vec<Box<dyn Packet>>,
     ) -> Self {
         Self {
-            behaviour: self.behaviour.tick(global_state_manager),
+            id: self.id,
+            behaviour: self
+                .behaviour
+                .tick(self.id, global_state_manager, incoming_packets),
             move_behaviour: self.move_behaviour,
             position: self.position,
         }
@@ -64,16 +97,15 @@ impl<
         global_state_manager: &GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
     ) -> Self {
         let mut new = self.clone();
-        let (move_behaviour, position) = self
-            .move_behaviour
-            .tick(global_state_manager, self.position);
+        let (move_behaviour, position) =
+            self.move_behaviour
+                .tick(self.id, global_state_manager, self.position);
         new.move_behaviour = move_behaviour;
         new.position = position;
         new
     }
 }
 
-#[derive(Clone)]
 pub struct GlobalStateManager<
     'a,
     NodeBehaviourType: NodeBehaviour<A, K>,
@@ -85,6 +117,10 @@ pub struct GlobalStateManager<
     nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>>,
     /// 32 is the bucket size, might be worth profiling different values (see https://github.com/sdd/kiddo/blob/20560517c7e06d71a6887a7662b89b70091ef8db/examples/cities.rs#L96)
     tree: ImmutableKdTree<A, u32, K, 32>,
+    /// Packets that have been sent to each node in the previous tick.
+    incoming_packets: HashMap<NodeID, Vec<Box<dyn Packet>>>,
+    /// Packets that have been sent to each node during this tick.
+    new_packets: HashMap<NodeID, Mutex<Vec<Box<dyn Packet>>>>,
 }
 
 impl<
@@ -95,24 +131,32 @@ impl<
 > GlobalStateManager<'_, NodeBehaviourType, MoveBehaviourType, A, K>
 {
     fn tick(self) -> Self {
-        let mut new = self.clone();
-        let nodes = new
+        let nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>> = self
             .nodes
+            .clone()
             .into_iter()
             .map(|x| x.tick_movement(&self))
             .collect();
 
-        new.nodes = nodes;
-
-        let mut new_2 = new.clone();
-        let nodes = new_2
-            .nodes
+        let nodes = nodes
             .into_iter()
-            .map(|x| x.tick_behaviour(&new))
+            .map(|x| {
+                let packets = self.incoming_packets.get(&x.id).unwrap();
+                x.tick_behaviour(&self, packets)
+            })
             .collect();
 
-        new_2.nodes = nodes;
-        new_2
+        Self {
+            nodes,
+            sim_manager: self.sim_manager,
+            tree: self.tree, // TODO - rebuild because of movement
+            incoming_packets: self
+                .new_packets
+                .into_iter()
+                .map(|(id, packets)| (id, packets.into_inner().unwrap()))
+                .collect(),
+            new_packets: HashMap::new(), // TODO - instantiate for each ID
+        }
     }
 }
 
