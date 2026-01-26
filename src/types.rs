@@ -14,7 +14,7 @@ where
         self,
         node_data: &NodeData<A, K>,
         global_state_manager: &GlobalStateManager<Self, impl MoveBehaviour<A, K>, A, K>,
-        incoming_packets: &Vec<Box<dyn Packet>>,
+        incoming_packets: &Vec<Box<dyn Packet<A, K>>>,
     ) -> Self;
 }
 
@@ -36,9 +36,13 @@ struct UnicastPacket {
     content: Box<[u8]>,
 }
 
-impl Packet for UnicastPacket {
+impl<A: kiddo::float::kdtree::Axis, const K: usize> Packet<A, K> for UnicastPacket {
     fn content(self) -> Box<[u8]> {
         self.content
+    }
+
+    fn targets(&self, target: &NodeData<A, K>) -> bool {
+        target.id == self.target
     }
 }
 
@@ -46,14 +50,21 @@ struct MulticastPacket {
     content: Box<[u8]>,
 }
 
-impl Packet for MulticastPacket {
+impl<A: kiddo::float::kdtree::Axis, const K: usize> Packet<A, K> for MulticastPacket {
     fn content(self) -> Box<[u8]> {
         self.content
     }
+
+    fn targets(&self, target: &NodeData<A, K>) -> bool {
+        true
+    }
 }
 
-pub trait Packet {
+pub trait Packet<A: kiddo::float::kdtree::Axis, const K: usize> {
     fn content(self) -> Box<[u8]>;
+
+    /// Whether a packet should be received by a given node
+    fn targets(&self, target: &NodeData<A, K>) -> bool;
 }
 
 #[derive(Clone)]
@@ -84,7 +95,7 @@ impl<
     fn tick_behaviour(
         self,
         global_state_manager: &GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
-        incoming_packets: &Vec<Box<dyn Packet>>,
+        incoming_packets: &Vec<Box<dyn Packet<A, K>>>,
     ) -> Self {
         Self {
             behaviour: self
@@ -121,9 +132,9 @@ pub struct GlobalStateManager<
     /// 32 is the bucket size, might be worth profiling different values (see https://github.com/sdd/kiddo/blob/20560517c7e06d71a6887a7662b89b70091ef8db/examples/cities.rs#L96)
     tree: ImmutableKdTree<A, u32, K, 32>,
     /// Packets that have been sent to each node in the previous tick.
-    incoming_packets: HashMap<NodeID, Vec<Box<dyn Packet>>>,
+    incoming_packets: HashMap<NodeID, Vec<Box<dyn Packet<A, K>>>>,
     /// Packets that have been sent to each node during this tick.
-    new_packets: HashMap<NodeID, Mutex<Vec<Box<dyn Packet>>>>,
+    new_packets: HashMap<NodeID, Mutex<Vec<Box<dyn Packet<A, K>>>>>,
 }
 
 impl<
@@ -162,7 +173,7 @@ impl<
         }
     }
 
-    pub fn transmit_packet(&self, transmitter: &NodeData<A, K>) {
+    pub fn transmit_packet(&self, transmitter: &NodeData<A, K>, packet: impl Packet<A, K>) {
         // TODO
     }
 }
