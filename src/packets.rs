@@ -1,11 +1,11 @@
-use crate::types::{NodeData, NodeID};
+use crate::types::{Coord, NodeData, NodeID};
 
 struct UnicastPacket {
     target: NodeID,
     content: Box<[u8]>,
 }
 
-impl<A: kiddo::float::kdtree::Axis, const K: usize> Packet<A, K> for UnicastPacket {
+impl<A: Coord<K>, const K: usize> Packet<A, K> for UnicastPacket {
     fn content(self) -> Box<[u8]> {
         self.content
     }
@@ -23,7 +23,7 @@ struct MulticastPacket {
     content: Box<[u8]>,
 }
 
-impl<A: kiddo::float::kdtree::Axis, const K: usize> Packet<A, K> for MulticastPacket {
+impl<A: Coord<K>, const K: usize> Packet<A, K> for MulticastPacket {
     fn content(self) -> Box<[u8]> {
         self.content
     }
@@ -37,7 +37,7 @@ impl<A: kiddo::float::kdtree::Axis, const K: usize> Packet<A, K> for MulticastPa
     }
 }
 
-pub trait Packet<A: kiddo::float::kdtree::Axis, const K: usize> {
+pub trait Packet<A: Coord<K>, const K: usize> {
     fn content(self) -> Box<[u8]>;
 
     /// Returns a vec of all NodeIDs which could receive the packet if they are in range.

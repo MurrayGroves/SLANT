@@ -1,23 +1,18 @@
-use crate::types::{GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, NodeID};
+use crate::types::{Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, NodeID};
 use num_traits::Float;
 
 #[derive(Clone)]
-pub struct RandomWalk<const CHANGE_DELAY: u8, A: kiddo::float::kdtree::Axis, const K: usize> {
+pub struct RandomWalk<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> {
     tick_counter: u8,
     direction: [A; K],
 }
 
-impl<const CHANGE_DELAY: u8, A: kiddo::float::kdtree::Axis, const K: usize>
-    RandomWalk<CHANGE_DELAY, A, K>
-{
+impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> RandomWalk<CHANGE_DELAY, A, K> {
     const CHANGE_DELAY: u8 = 16;
 }
 
-impl<
-    const CHANGE_DELAY: u8,
-    A: kiddo::float::kdtree::Axis + num_traits::float::Float,
-    const K: usize,
-> MoveBehaviour<A, K> for RandomWalk<CHANGE_DELAY, A, K>
+impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> MoveBehaviour<A, K>
+    for RandomWalk<CHANGE_DELAY, A, K>
 {
     fn tick(
         self,
