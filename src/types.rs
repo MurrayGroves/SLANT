@@ -138,10 +138,12 @@ impl<
             })
             .collect();
 
+        let tree = ImmutableKdTree::new_from_slice(&nodes.as_slice());
+
         Self {
             nodes,
             sim_manager: self.sim_manager,
-            tree: self.tree, // TODO - rebuild because of movement
+            tree,
             incoming_packets: self
                 .new_packets
                 .into_iter()
