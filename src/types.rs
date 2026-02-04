@@ -6,7 +6,7 @@ use kiddo::traits::Content;
 use num_traits::Float;
 use num_traits::float::FloatCore;
 use rand_xoshiro::Xoshiro256Plus;
-use rand_xoshiro::rand_core::RngCore;
+use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::iter::Sum;
@@ -33,13 +33,14 @@ where
         self,
         data: &NodeData<A, K>,
         global_state_manager: &GlobalStateManager<impl NodeBehaviour<A, K>, Self, A, K>,
+        sim_manager: &SimManager<impl NodeBehaviour<A, K>, Self, A, K>,
     ) -> (Self, [A; K]);
 }
 
 pub type NodeID = usize;
 
 #[derive(Clone)]
-struct Node<
+pub struct Node<
     NodeBehaviourType: NodeBehaviour<A, K>,
     MoveBehaviourType: MoveBehaviour<A, K>,
     A: Coord<K>,
@@ -87,9 +88,12 @@ impl<
     fn tick_movement(
         self,
         global_state_manager: &GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
+        sim_manager: &SimManager<NodeBehaviourType, MoveBehaviourType, A, K>,
     ) -> Self {
         let mut new = self.clone();
-        let (move_behaviour, position) = self.move_behaviour.tick(&self.data, global_state_manager);
+        let (move_behaviour, position) =
+            self.move_behaviour
+                .tick(&self.data, global_state_manager, sim_manager);
         new.move_behaviour = move_behaviour;
         let mut data = self.data;
         data.position = position;
@@ -99,13 +103,11 @@ impl<
 }
 
 pub struct GlobalStateManager<
-    'a,
     NodeBehaviourType: NodeBehaviour<A, K>,
     MoveBehaviourType: MoveBehaviour<A, K>,
     A: Coord<K>,
     const K: usize,
 > {
-    pub sim_manager: &'a SimManager<'a, NodeBehaviourType, MoveBehaviourType, A, K>,
     pub(crate) nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>>,
     /// 32 is the bucket size, might be worth profiling different values (see https://github.com/sdd/kiddo/blob/20560517c7e06d71a6887a7662b89b70091ef8db/examples/cities.rs#L96)
     tree: ImmutableKdTree<A, u32, K, 32>,
@@ -120,17 +122,42 @@ impl<
     MoveBehaviourType: MoveBehaviour<A, K>,
     A: Coord<K>,
     const K: usize,
-> GlobalStateManager<'_, NodeBehaviourType, MoveBehaviourType, A, K>
+> GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>
 {
-    fn tick(self) -> Self {
+    fn new(
+        nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>>,
+    ) -> GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, { K }> {
+        Self {
+            tree: ImmutableKdTree::new_from_slice(
+                nodes
+                    .iter()
+                    .map(|x| x.data.position)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            ),
+            incoming_packets: HashMap::from_iter((0..nodes.len()).map(|x| (x, Vec::new()))),
+            new_packets: HashMap::from_iter((0..nodes.len()).map(|x| (x, Mutex::new(Vec::new())))),
+            nodes,
+        }
+    }
+}
+
+impl<
+    NodeBehaviourType: NodeBehaviour<A, K>,
+    MoveBehaviourType: MoveBehaviour<A, K>,
+    A: Coord<K>,
+    const K: usize,
+> GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>
+{
+    fn tick(self, sim_manager: &SimManager<NodeBehaviourType, MoveBehaviourType, A, K>) -> Self {
         let nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>> = self
             .nodes
             .clone()
             .into_iter()
-            .map(|x| x.tick_movement(&self))
+            .map(|x| x.tick_movement(&self, sim_manager))
             .collect();
 
-        let nodes = nodes
+        let nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>> = nodes
             .into_iter()
             .map(|x| {
                 let packets = self.incoming_packets.get(&x.data.id).unwrap();
@@ -138,11 +165,16 @@ impl<
             })
             .collect();
 
-        let tree = ImmutableKdTree::new_from_slice(&nodes.as_slice());
+        let tree = ImmutableKdTree::new_from_slice(
+            nodes
+                .iter()
+                .map(|x| x.data.position)
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
 
         Self {
             nodes,
-            sim_manager: self.sim_manager,
             tree,
             incoming_packets: self
                 .new_packets
@@ -197,13 +229,12 @@ impl<
 }
 
 pub struct SimManager<
-    'a,
     NodeBehaviourType: NodeBehaviour<A, K>,
     MoveBehaviourType: MoveBehaviour<A, K>,
     A: Coord<K>,
     const K: usize,
 > {
-    global_state_manager: GlobalStateManager<'a, NodeBehaviourType, MoveBehaviourType, A, K>,
+    global_state_manager: GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
     rngs: Vec<UnsafeCell<Xoshiro256Plus>>,
 }
 
@@ -212,8 +243,36 @@ impl<
     MoveBehaviourType: MoveBehaviour<A, K>,
     A: Coord<K>,
     const K: usize,
-> SimManager<'_, NodeBehaviourType, MoveBehaviourType, A, K>
+> SimManager<NodeBehaviourType, MoveBehaviourType, A, K>
 {
+    pub fn new(
+        nodes: Vec<NodeInit<NodeBehaviourType, MoveBehaviourType, A, K>>,
+        seed: u64,
+    ) -> Self {
+        let rngs = (0..nodes.len())
+            .map(|x| UnsafeCell::new(Xoshiro256Plus::seed_from_u64(seed + x as u64)))
+            .collect();
+
+        let nodes = nodes
+            .into_iter()
+            .enumerate()
+            .map(|(index, node)| Node {
+                behaviour: node.node_behaviour,
+                move_behaviour: node.move_behaviour,
+                data: NodeData {
+                    id: index,
+                    position: node.starting_position,
+                    broadcast_distance: A::from(16.0).unwrap(),
+                },
+            })
+            .collect();
+
+        Self {
+            rngs,
+            global_state_manager: GlobalStateManager::new(nodes),
+        }
+    }
+
     /// `id` must be a unique ID for the behaviour accessing the method. Ensures reproducibility.
     pub fn get_random_range(&self, id: usize, min: A, max: A) -> A {
         // Assumes RNGs initialised for all initialised IDs!
@@ -226,4 +285,16 @@ impl<
         // TODO - Verify distribution
         (A::from(int).unwrap() % (max - min)) + min
     }
+}
+
+/// Constructed by end-user and passed into construction of sim
+pub struct NodeInit<
+    NodeBehaviourType: NodeBehaviour<A, K>,
+    MoveBehaviourType: MoveBehaviour<A, K>,
+    A: Coord<K>,
+    const K: usize,
+> {
+    pub starting_position: [A; K],
+    pub node_behaviour: NodeBehaviourType,
+    pub move_behaviour: MoveBehaviourType,
 }
