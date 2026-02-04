@@ -1,8 +1,8 @@
 use crate::types::{Coord, NodeData, NodeID};
 
-struct UnicastPacket {
-    target: NodeID,
-    content: Box<[u8]>,
+pub struct UnicastPacket {
+    pub target: NodeID,
+    pub content: Box<[u8]>,
 }
 
 impl<A: Coord<K>, const K: usize> Packet<A, K> for UnicastPacket {
@@ -19,8 +19,8 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for UnicastPacket {
     }
 }
 
-struct MulticastPacket {
-    content: Box<[u8]>,
+pub struct MulticastPacket {
+    pub content: Box<[u8]>,
 }
 
 impl<A: Coord<K>, const K: usize> Packet<A, K> for MulticastPacket {

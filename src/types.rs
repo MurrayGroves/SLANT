@@ -47,7 +47,7 @@ struct Node<
 > {
     behaviour: NodeBehaviourType,
     move_behaviour: MoveBehaviourType,
-    data: NodeData<A, K>,
+    pub(crate) data: NodeData<A, K>,
 }
 
 /// One dimension in a coordinate-space, should be either f32 or f64
@@ -106,7 +106,7 @@ pub struct GlobalStateManager<
     const K: usize,
 > {
     pub sim_manager: &'a SimManager<'a, NodeBehaviourType, MoveBehaviourType, A, K>,
-    nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>>,
+    pub(crate) nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>>,
     /// 32 is the bucket size, might be worth profiling different values (see https://github.com/sdd/kiddo/blob/20560517c7e06d71a6887a7662b89b70091ef8db/examples/cities.rs#L96)
     tree: ImmutableKdTree<A, u32, K, 32>,
     /// Packets that have been sent to each node in the previous tick.
