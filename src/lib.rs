@@ -1,7 +1,7 @@
 extern crate core;
 
-mod types;
+pub mod types;
 
-mod example_behaviours;
-mod packets;
-mod traffic_generators;
+pub mod example_behaviours;
+pub mod packets;
+pub mod traffic_generators;

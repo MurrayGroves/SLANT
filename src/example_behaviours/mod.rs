@@ -11,6 +11,13 @@ pub struct RandomWalk<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> {
 
 impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> RandomWalk<CHANGE_DELAY, A, K> {
     const CHANGE_DELAY: u8 = 16;
+
+    pub fn new(starting_direction: [A; K]) -> Self {
+        Self {
+            tick_counter: 0,
+            direction: starting_direction,
+        }
+    }
 }
 
 impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> MoveBehaviour<A, K>
@@ -20,13 +27,12 @@ impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> MoveBehaviour<A, K>
         self,
         data: &NodeData<A, K>,
         global_state_manager: &GlobalStateManager<impl NodeBehaviour<A, K>, Self, A, K>,
-        sim_manager: &SimManager<impl NodeBehaviour<A, K>, Self, A, K>,
     ) -> (Self, [A; K]) {
         let mut position = data.position;
         let mut direction = self.direction;
         if self.tick_counter % CHANGE_DELAY == 0 {
             for i in 0..K {
-                let val = sim_manager.get_random_range(
+                let val = global_state_manager.get_random_range(
                     data.id,
                     A::from(-1.0).unwrap(),
                     A::from(1.0).unwrap(),

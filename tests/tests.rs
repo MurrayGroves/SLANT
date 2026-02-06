@@ -1,0 +1,109 @@
+use lazy_static::lazy_static;
+use log::trace;
+use manetsim::example_behaviours::RandomWalk;
+use manetsim::traffic_generators::mixed_multicast_and_random_target_unicast;
+use manetsim::types::{
+    GlobalStateManager, MoveBehaviour, Node, NodeBehaviour, NodeData, NodeInit, SimManager,
+};
+use rand::SeedableRng;
+use rand_xoshiro::Xoshiro256Plus;
+use std::sync::{Arc, Mutex};
+
+/// Node that just logs all incoming packets
+#[derive(Clone)]
+struct LoggerNode {}
+
+impl NodeBehaviour<f64, 2> for LoggerNode {
+    fn tick(
+        self,
+        node_data: &NodeData<f64, 2>,
+        global_state_manager: &GlobalStateManager<Self, impl MoveBehaviour<f64, 2>, f64, 2>,
+        incoming_packets: &Vec<Arc<dyn manetsim::packets::Packet<f64, 2>>>,
+    ) -> Self {
+        trace!(
+            "Node {} received packets {:?}",
+            node_data.id, incoming_packets
+        );
+        let mut counter = packet_counter.lock().unwrap();
+        *counter += incoming_packets.len();
+        Self {}
+    }
+}
+
+lazy_static! {
+    static ref packet_counter: Mutex<usize> = Mutex::new(0);
+}
+
+#[test]
+fn ten_ticks_random_walk() {
+    env_logger::init();
+
+    let nodes: Vec<NodeInit<LoggerNode, RandomWalk<2, f64, 2>, f64, 2>> = vec![
+        NodeInit {
+            starting_position: [0.0, 0.0],
+            node_behaviour: LoggerNode {},
+            move_behaviour: RandomWalk::new([0.0, 1.0]),
+        },
+        NodeInit {
+            starting_position: [1.0, 0.0],
+            node_behaviour: LoggerNode {},
+            move_behaviour: RandomWalk::new([1.0, 1.0]),
+        },
+        NodeInit {
+            starting_position: [1.0, 1.0],
+            node_behaviour: LoggerNode {},
+            move_behaviour: RandomWalk::new([1.0, 0.0]),
+        },
+        NodeInit {
+            starting_position: [0.0, 1.0],
+            node_behaviour: LoggerNode {},
+            move_behaviour: RandomWalk::new([-1.0, 1.0]),
+        },
+        NodeInit {
+            starting_position: [1.0, 0.0],
+            node_behaviour: LoggerNode {},
+            move_behaviour: RandomWalk::new([1.0, -3.0]),
+        },
+        NodeInit {
+            starting_position: [1.0, 5.0],
+            node_behaviour: LoggerNode {},
+            move_behaviour: RandomWalk::new([6.0, 1.0]),
+        },
+        NodeInit {
+            starting_position: [1.0, 0.0],
+            node_behaviour: LoggerNode {},
+            move_behaviour: RandomWalk::new([3.0, 1.0]),
+        },
+    ];
+
+    let mut sim_manager = SimManager::new(nodes.clone(), 123);
+    let mut rng = Xoshiro256Plus::seed_from_u64(123456);
+    for _ in 0..10 {
+        mixed_multicast_and_random_target_unicast(
+            &mut rng,
+            &sim_manager.global_state_manager,
+            5,
+            5,
+        );
+        sim_manager = sim_manager.n_ticks(1);
+    }
+
+    let ctr = packet_counter.lock().unwrap();
+    assert_eq!(*ctr, 87);
+
+    assert!(
+        sim_manager
+            .global_state_manager
+            .nodes()
+            .iter()
+            .zip(nodes.iter())
+            .all(|(new, original)| {
+                trace!(
+                    "{:?} -> {:?}",
+                    original.starting_position,
+                    new.data().position
+                );
+                new.data().position != original.starting_position
+            })
+    );
+}

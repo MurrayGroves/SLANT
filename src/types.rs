@@ -3,8 +3,11 @@ use kiddo::SquaredEuclidean;
 use kiddo::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::traits::Content;
+use log::trace;
 use num_traits::Float;
 use num_traits::float::FloatCore;
+use rand::Rng;
+use rand::distr::uniform::SampleUniform;
 use rand_xoshiro::Xoshiro256Plus;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 use std::cell::UnsafeCell;
@@ -33,7 +36,6 @@ where
         self,
         data: &NodeData<A, K>,
         global_state_manager: &GlobalStateManager<impl NodeBehaviour<A, K>, Self, A, K>,
-        sim_manager: &SimManager<impl NodeBehaviour<A, K>, Self, A, K>,
     ) -> (Self, [A; K]);
 }
 
@@ -53,9 +55,18 @@ pub struct Node<
 
 /// One dimension in a coordinate-space, should be either f32 or f64
 pub trait Coord<const K: usize>:
-    Float + Sum + kiddo::float::kdtree::Axis + LeafSliceFloatChunk<u32, K> + LeafSliceFloat<u32>
+    Float
+    + Sum
+    + kiddo::float::kdtree::Axis
+    + LeafSliceFloatChunk<u32, K>
+    + LeafSliceFloat<u32>
+    + SampleUniform
 {
 }
+
+impl Coord<2> for f32 {}
+
+impl Coord<2> for f64 {}
 
 #[derive(Clone)]
 pub struct NodeData<A: Coord<K>, const K: usize> {
@@ -88,17 +99,18 @@ impl<
     fn tick_movement(
         self,
         global_state_manager: &GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
-        sim_manager: &SimManager<NodeBehaviourType, MoveBehaviourType, A, K>,
     ) -> Self {
         let mut new = self.clone();
-        let (move_behaviour, position) =
-            self.move_behaviour
-                .tick(&self.data, global_state_manager, sim_manager);
+        let (move_behaviour, position) = self.move_behaviour.tick(&self.data, global_state_manager);
         new.move_behaviour = move_behaviour;
         let mut data = self.data;
         data.position = position;
         new.data = data;
         new
+    }
+
+    pub fn data(&self) -> &NodeData<A, K> {
+        &self.data
     }
 }
 
@@ -115,6 +127,7 @@ pub struct GlobalStateManager<
     incoming_packets: HashMap<NodeID, Vec<Arc<dyn Packet<A, K>>>>,
     /// Packets that have been sent to each node during this tick.
     new_packets: HashMap<NodeID, Mutex<Vec<Arc<dyn Packet<A, K>>>>>,
+    rngs: Vec<UnsafeCell<Xoshiro256Plus>>,
 }
 
 impl<
@@ -126,6 +139,7 @@ impl<
 {
     fn new(
         nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>>,
+        seed: u64,
     ) -> GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, { K }> {
         Self {
             tree: ImmutableKdTree::new_from_slice(
@@ -137,8 +151,15 @@ impl<
             ),
             incoming_packets: HashMap::from_iter((0..nodes.len()).map(|x| (x, Vec::new()))),
             new_packets: HashMap::from_iter((0..nodes.len()).map(|x| (x, Mutex::new(Vec::new())))),
+            rngs: (0..nodes.len())
+                .map(|x| UnsafeCell::new(Xoshiro256Plus::seed_from_u64(seed + x as u64)))
+                .collect(),
             nodes,
         }
+    }
+
+    pub fn nodes(&self) -> &Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>> {
+        &self.nodes
     }
 }
 
@@ -149,12 +170,12 @@ impl<
     const K: usize,
 > GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>
 {
-    fn tick(self, sim_manager: &SimManager<NodeBehaviourType, MoveBehaviourType, A, K>) -> Self {
+    fn tick(self) -> Self {
         let nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>> = self
             .nodes
             .clone()
             .into_iter()
-            .map(|x| x.tick_movement(&self, sim_manager))
+            .map(|x| x.tick_movement(&self))
             .collect();
 
         let nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>> = nodes
@@ -184,6 +205,7 @@ impl<
             new_packets: HashMap::from_iter(
                 (0..self.nodes.len()).map(|x| (x, Mutex::new(Vec::new()))),
             ), // TODO - Don't instantiate a new one each tick!
+            rngs: self.rngs,
         }
     }
 
@@ -226,6 +248,19 @@ impl<
             packets.push(packet.clone());
         }
     }
+
+    /// `id` must be a unique ID for the behaviour accessing the method. Ensures reproducibility.
+    pub fn get_random_range(&self, id: usize, min: A, max: A) -> A {
+        // Assumes RNGs initialised for all initialised IDs!
+        let out = unsafe {
+            let cell: *const UnsafeCell<Xoshiro256Plus> = &self.rngs[id];
+            let rng = UnsafeCell::raw_get(cell);
+            rng.as_mut().unwrap().random_range(min..max)
+        };
+
+        trace!("{} generated {:?}", id, out);
+        out
+    }
 }
 
 pub struct SimManager<
@@ -234,8 +269,7 @@ pub struct SimManager<
     A: Coord<K>,
     const K: usize,
 > {
-    global_state_manager: GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
-    rngs: Vec<UnsafeCell<Xoshiro256Plus>>,
+    pub global_state_manager: GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
 }
 
 impl<
@@ -249,10 +283,6 @@ impl<
         nodes: Vec<NodeInit<NodeBehaviourType, MoveBehaviourType, A, K>>,
         seed: u64,
     ) -> Self {
-        let rngs = (0..nodes.len())
-            .map(|x| UnsafeCell::new(Xoshiro256Plus::seed_from_u64(seed + x as u64)))
-            .collect();
-
         let nodes = nodes
             .into_iter()
             .enumerate()
@@ -262,32 +292,27 @@ impl<
                 data: NodeData {
                     id: index,
                     position: node.starting_position,
-                    broadcast_distance: A::from(16.0).unwrap(),
+                    broadcast_distance: A::from(1.0).unwrap(),
                 },
             })
             .collect();
 
         Self {
-            rngs,
-            global_state_manager: GlobalStateManager::new(nodes),
+            global_state_manager: GlobalStateManager::new(nodes, seed),
         }
     }
 
-    /// `id` must be a unique ID for the behaviour accessing the method. Ensures reproducibility.
-    pub fn get_random_range(&self, id: usize, min: A, max: A) -> A {
-        // Assumes RNGs initialised for all initialised IDs!
-        let int = unsafe {
-            let cell: *const UnsafeCell<Xoshiro256Plus> = &self.rngs[id];
-            let rng = UnsafeCell::raw_get(cell);
-            rng.as_mut().unwrap().next_u64()
-        };
-
-        // TODO - Verify distribution
-        (A::from(int).unwrap() % (max - min)) + min
+    /// Perform `n` ticks of the simulation, returning the new global state at the end
+    pub fn n_ticks(mut self, num_ticks: usize) -> Self {
+        for _ in 0..num_ticks {
+            self.global_state_manager = self.global_state_manager.tick();
+        }
+        self
     }
 }
 
 /// Constructed by end-user and passed into construction of sim
+#[derive(Clone)]
 pub struct NodeInit<
     NodeBehaviourType: NodeBehaviour<A, K>,
     MoveBehaviourType: MoveBehaviour<A, K>,

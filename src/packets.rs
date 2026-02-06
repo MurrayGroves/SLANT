@@ -1,4 +1,5 @@
 use crate::types::{Coord, NodeData, NodeID};
+use std::fmt::{Debug, Formatter};
 
 pub struct UnicastPacket {
     pub target: NodeID,
@@ -16,6 +17,12 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for UnicastPacket {
 
     fn targets(&self, target: &NodeData<A, K>) -> bool {
         target.id == self.target
+    }
+}
+
+impl Debug for UnicastPacket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&format!("{:?}", self.content))
     }
 }
 
@@ -37,7 +44,13 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for MulticastPacket {
     }
 }
 
-pub trait Packet<A: Coord<K>, const K: usize> {
+impl Debug for MulticastPacket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&format!("{:?}", self.content))
+    }
+}
+
+pub trait Packet<A: Coord<K>, const K: usize>: Debug {
     fn content(self) -> Box<[u8]>;
 
     /// Returns a vec of all NodeIDs which could receive the packet if they are in range.
