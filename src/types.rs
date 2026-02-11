@@ -10,7 +10,8 @@ use rand::Rng;
 use rand::distr::uniform::SampleUniform;
 use rand_xoshiro::Xoshiro256Plus;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
-use std::cell::UnsafeCell;
+use rayon::prelude::*;
+use std::cell::SyncUnsafeCell;
 use std::collections::HashMap;
 use std::iter::Sum;
 use std::sync::{Arc, Mutex};
@@ -18,7 +19,7 @@ use std::sync::{Arc, Mutex};
 /// Describes a node behaviour which performs some processing each tick to produce a new node behaviour
 pub trait NodeBehaviour<A: Coord<K>, const K: usize>
 where
-    Self: Sized + Send + Clone,
+    Self: Sized + Send + Sync + Clone,
 {
     fn tick(
         self,
@@ -30,7 +31,7 @@ where
 
 pub trait MoveBehaviour<A: Coord<K>, const K: usize>
 where
-    Self: Sized + Send + Clone,
+    Self: Sized + Send + Sync + Clone,
 {
     fn tick(
         self,
@@ -120,14 +121,14 @@ pub struct GlobalStateManager<
     A: Coord<K>,
     const K: usize,
 > {
-    pub(crate) nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>>,
+    pub(crate) nodes: Arc<Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>>>,
     /// 32 is the bucket size, might be worth profiling different values (see https://github.com/sdd/kiddo/blob/20560517c7e06d71a6887a7662b89b70091ef8db/examples/cities.rs#L96)
-    tree: ImmutableKdTree<A, u32, K, 32>,
+    tree: Arc<ImmutableKdTree<A, u32, K, 32>>,
     /// Packets that have been sent to each node in the previous tick.
-    incoming_packets: HashMap<NodeID, Vec<Arc<dyn Packet<A, K>>>>,
+    incoming_packets: Arc<HashMap<NodeID, Vec<Arc<dyn Packet<A, K>>>>>,
     /// Packets that have been sent to each node during this tick.
-    new_packets: HashMap<NodeID, Mutex<Vec<Arc<dyn Packet<A, K>>>>>,
-    rngs: Vec<UnsafeCell<Xoshiro256Plus>>,
+    new_packets: Arc<HashMap<NodeID, Mutex<Vec<Arc<dyn Packet<A, K>>>>>>,
+    rngs: Arc<Vec<SyncUnsafeCell<Xoshiro256Plus>>>,
 }
 
 impl<
@@ -142,19 +143,25 @@ impl<
         seed: u64,
     ) -> GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, { K }> {
         Self {
-            tree: ImmutableKdTree::new_from_slice(
+            tree: Arc::new(ImmutableKdTree::new_from_slice(
                 nodes
                     .iter()
                     .map(|x| x.data.position)
                     .collect::<Vec<_>>()
                     .as_slice(),
+            )),
+            incoming_packets: Arc::new(HashMap::from_iter(
+                (0..nodes.len()).map(|x| (x, Vec::new())),
+            )),
+            new_packets: Arc::new(HashMap::from_iter(
+                (0..nodes.len()).map(|x| (x, Mutex::new(Vec::new()))),
+            )),
+            rngs: Arc::new(
+                (0..nodes.len())
+                    .map(|x| SyncUnsafeCell::new(Xoshiro256Plus::seed_from_u64(seed + x as u64)))
+                    .collect(),
             ),
-            incoming_packets: HashMap::from_iter((0..nodes.len()).map(|x| (x, Vec::new()))),
-            new_packets: HashMap::from_iter((0..nodes.len()).map(|x| (x, Mutex::new(Vec::new())))),
-            rngs: (0..nodes.len())
-                .map(|x| UnsafeCell::new(Xoshiro256Plus::seed_from_u64(seed + x as u64)))
-                .collect(),
-            nodes,
+            nodes: Arc::new(nodes),
         }
     }
 
@@ -171,15 +178,14 @@ impl<
 > GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>
 {
     fn tick(self) -> Self {
-        let nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>> = self
-            .nodes
+        let nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>> = (*self.nodes)
             .clone()
-            .into_iter()
+            .into_par_iter()
             .map(|x| x.tick_movement(&self))
             .collect();
 
         let nodes: Vec<Node<NodeBehaviourType, MoveBehaviourType, A, K>> = nodes
-            .into_iter()
+            .into_par_iter()
             .map(|x| {
                 let packets = self.incoming_packets.get(&x.data.id).unwrap();
                 x.tick_behaviour(&self, packets)
@@ -194,18 +200,22 @@ impl<
                 .as_slice(),
         );
 
+        // The only time we have other Arcs is during ticking
+        let new_packets = Arc::into_inner(self.new_packets).unwrap();
+
         Self {
-            nodes,
-            tree,
-            incoming_packets: self
-                .new_packets
-                .into_iter()
-                .map(|(id, packets)| (id, packets.into_inner().unwrap()))
-                .collect(),
-            new_packets: HashMap::from_iter(
-                (0..self.nodes.len()).map(|x| (x, Mutex::new(Vec::new()))),
-            ), // TODO - Don't instantiate a new one each tick!
+            tree: Arc::new(tree),
+            incoming_packets: Arc::new(
+                new_packets
+                    .into_iter()
+                    .map(|(id, packets)| (id, packets.into_inner().unwrap()))
+                    .collect(),
+            ),
+            new_packets: Arc::new(HashMap::from_iter(
+                (0..nodes.len()).map(|x| (x, Mutex::new(Vec::new()))),
+            )), // TODO - Don't instantiate a new one each tick!
             rngs: self.rngs,
+            nodes: Arc::new(nodes),
         }
     }
 
@@ -253,8 +263,8 @@ impl<
     pub fn get_random_range(&self, id: usize, min: A, max: A) -> A {
         // Assumes RNGs initialised for all initialised IDs!
         let out = unsafe {
-            let cell: *const UnsafeCell<Xoshiro256Plus> = &self.rngs[id];
-            let rng = UnsafeCell::raw_get(cell);
+            let cell: *const SyncUnsafeCell<Xoshiro256Plus> = &self.rngs[id];
+            let rng = SyncUnsafeCell::raw_get(cell);
             rng.as_mut().unwrap().random_range(min..max)
         };
 

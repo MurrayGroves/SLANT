@@ -10,8 +10,6 @@ pub struct RandomWalk<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> {
 }
 
 impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> RandomWalk<CHANGE_DELAY, A, K> {
-    const CHANGE_DELAY: u8 = 16;
-
     pub fn new(starting_direction: [A; K]) -> Self {
         Self {
             tick_counter: 0,

@@ -1,3 +1,4 @@
+#![feature(sync_unsafe_cell)]
 extern crate core;
 
 pub mod types;

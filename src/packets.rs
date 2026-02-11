@@ -50,7 +50,7 @@ impl Debug for MulticastPacket {
     }
 }
 
-pub trait Packet<A: Coord<K>, const K: usize>: Debug {
+pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync {
     fn content(self) -> Box<[u8]>;
 
     /// Returns a vec of all NodeIDs which could receive the packet if they are in range.
