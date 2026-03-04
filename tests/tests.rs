@@ -1,6 +1,9 @@
 use lazy_static::lazy_static;
 use log::trace;
 use manetsim::example_behaviours::RandomWalk;
+use manetsim::propagation_models::{
+    PropagationModel, PropagationParams, SimpleDistance, SimpleDistanceParams,
+};
 use manetsim::traffic_generators::mixed_multicast_and_random_target_unicast;
 use manetsim::types::{
     GlobalStateManager, MoveBehaviour, Node, NodeBehaviour, NodeData, NodeInit, SimManager,
@@ -14,10 +17,16 @@ use std::sync::{Arc, Mutex};
 struct LoggerNode {}
 
 impl NodeBehaviour<f64, 2> for LoggerNode {
-    fn tick(
+    fn tick<P: PropagationParams<f64, 2>>(
         self,
-        node_data: &NodeData<f64, 2>,
-        global_state_manager: &GlobalStateManager<Self, impl MoveBehaviour<f64, 2>, f64, 2>,
+        node_data: &NodeData<f64, 2, P>,
+        global_state_manager: &GlobalStateManager<
+            Self,
+            impl MoveBehaviour<f64, 2>,
+            impl PropagationModel<f64, 2, P = P>,
+            f64,
+            2,
+        >,
         incoming_packets: &Vec<Arc<dyn manetsim::packets::Packet<f64, 2>>>,
     ) -> Self {
         trace!(
@@ -38,45 +47,60 @@ lazy_static! {
 fn ten_ticks_random_walk() {
     env_logger::init();
 
-    let nodes: Vec<NodeInit<LoggerNode, RandomWalk<2, f64, 2>, f64, 2>> = vec![
+    let propagation_params = SimpleDistanceParams {
+        transmit_distance: 1.0,
+    };
+
+    let prop_model = SimpleDistance;
+
+    let nodes: Vec<
+        NodeInit<LoggerNode, RandomWalk<2, f64, 2>, SimpleDistanceParams<f64, 2>, f64, 2>,
+    > = vec![
         NodeInit {
             starting_position: [0.0, 0.0],
             node_behaviour: LoggerNode {},
             move_behaviour: RandomWalk::new([0.0, 1.0]),
+            propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [1.0, 0.0],
             node_behaviour: LoggerNode {},
             move_behaviour: RandomWalk::new([1.0, 1.0]),
+            propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [1.0, 1.0],
             node_behaviour: LoggerNode {},
             move_behaviour: RandomWalk::new([1.0, 0.0]),
+            propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [0.0, 1.0],
             node_behaviour: LoggerNode {},
             move_behaviour: RandomWalk::new([-1.0, 1.0]),
+            propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [1.0, 0.0],
             node_behaviour: LoggerNode {},
             move_behaviour: RandomWalk::new([1.0, -3.0]),
+            propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [1.0, 5.0],
             node_behaviour: LoggerNode {},
             move_behaviour: RandomWalk::new([6.0, 1.0]),
+            propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [1.0, 0.0],
             node_behaviour: LoggerNode {},
             move_behaviour: RandomWalk::new([3.0, 1.0]),
+            propagation_params,
         },
     ];
 
-    let mut sim_manager = SimManager::new(nodes.clone(), 123);
+    let mut sim_manager = SimManager::new(nodes.clone(), 123, prop_model);
     let mut rng = Xoshiro256Plus::seed_from_u64(123456);
     for _ in 0..10 {
         mixed_multicast_and_random_target_unicast(
@@ -89,7 +113,7 @@ fn ten_ticks_random_walk() {
     }
 
     let ctr = packet_counter.lock().unwrap();
-    assert_eq!(*ctr, 87);
+    assert_eq!(*ctr, 89);
 
     assert!(
         sim_manager

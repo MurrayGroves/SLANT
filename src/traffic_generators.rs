@@ -1,4 +1,5 @@
 use crate::packets::{MulticastPacket, UnicastPacket};
+use crate::propagation_models::PropagationModel;
 use crate::types::{Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeID};
 
 pub fn mixed_multicast_and_random_target_unicast<
@@ -8,7 +9,13 @@ pub fn mixed_multicast_and_random_target_unicast<
     const K: usize,
 >(
     rng: &mut impl rand::Rng,
-    global_state_manager: &GlobalStateManager<NodeBehaviourType, MoveBehaviourType, A, K>,
+    global_state_manager: &GlobalStateManager<
+        NodeBehaviourType,
+        MoveBehaviourType,
+        impl PropagationModel<A, K>,
+        A,
+        K,
+    >,
     num_multicast: usize,
     num_unicast: usize,
 ) {

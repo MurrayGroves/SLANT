@@ -1,3 +1,4 @@
+use crate::propagation_models::PropagationParams;
 use crate::types::{Coord, NodeData, NodeID};
 use std::fmt::{Debug, Formatter};
 
@@ -15,7 +16,7 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for UnicastPacket {
         Some(vec![self.target])
     }
 
-    fn targets(&self, target: &NodeData<A, K>) -> bool {
+    fn targets<P: PropagationParams<A, K>>(&self, target: &NodeData<A, K, P>) -> bool {
         target.id == self.target
     }
 }
@@ -39,7 +40,7 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for MulticastPacket {
         None
     }
 
-    fn targets(&self, target: &NodeData<A, K>) -> bool {
+    fn targets<P: PropagationParams<A, K>>(&self, target: &NodeData<A, K, P>) -> bool {
         true
     }
 }
@@ -59,5 +60,7 @@ pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync {
     fn eager_targets(&self) -> Option<Vec<NodeID>>;
 
     /// Whether a packet should be received by a given node
-    fn targets(&self, target: &NodeData<A, K>) -> bool;
+    fn targets<P: PropagationParams<A, K>>(&self, target: &NodeData<A, K, P>) -> bool
+    where
+        Self: Sized;
 }

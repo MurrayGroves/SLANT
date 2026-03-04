@@ -1,3 +1,4 @@
+use crate::propagation_models::{PropagationModel, PropagationParams};
 use crate::types::{
     Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, NodeID, SimManager,
 };
@@ -21,10 +22,16 @@ impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> RandomWalk<CHANGE_DELA
 impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> MoveBehaviour<A, K>
     for RandomWalk<CHANGE_DELAY, A, K>
 {
-    fn tick(
+    fn tick<P: PropagationParams<A, K>>(
         self,
-        data: &NodeData<A, K>,
-        global_state_manager: &GlobalStateManager<impl NodeBehaviour<A, K>, Self, A, K>,
+        data: &NodeData<A, K, P>,
+        global_state_manager: &GlobalStateManager<
+            impl NodeBehaviour<A, K>,
+            Self,
+            impl PropagationModel<A, K, P = P>,
+            A,
+            K,
+        >,
     ) -> (Self, [A; K]) {
         let mut position = data.position;
         let mut direction = self.direction;
