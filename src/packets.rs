@@ -12,6 +12,10 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for UnicastPacket {
         self.content
     }
 
+    fn content_ref(&self) -> &Box<[u8]> {
+        &self.content
+    }
+
     fn eager_targets(&self) -> Option<Vec<NodeID>> {
         Some(vec![self.target])
     }
@@ -36,6 +40,10 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for MulticastPacket {
         self.content
     }
 
+    fn content_ref(&self) -> &Box<[u8]> {
+        &self.content
+    }
+
     fn eager_targets(&self) -> Option<Vec<NodeID>> {
         None
     }
@@ -53,6 +61,8 @@ impl Debug for MulticastPacket {
 
 pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync {
     fn content(self) -> Box<[u8]>;
+
+    fn content_ref(&self) -> &Box<[u8]>;
 
     /// Returns a vec of all NodeIDs which could receive the packet if they are in range.
     /// Means the transmitter can avoid having to lookup all nodes in range.

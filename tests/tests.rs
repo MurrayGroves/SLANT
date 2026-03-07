@@ -1,3 +1,5 @@
+mod common;
+
 use lazy_static::lazy_static;
 use log::trace;
 use manetsim::example_behaviours::RandomWalk;
@@ -12,36 +14,7 @@ use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
 use std::sync::{Arc, Mutex};
 
-/// Node that just logs all incoming packets
-#[derive(Clone)]
-struct LoggerNode {}
-
-impl NodeBehaviour<f64, 2> for LoggerNode {
-    fn tick<P: PropagationParams<f64, 2>>(
-        self,
-        node_data: &NodeData<f64, 2, P>,
-        global_state_manager: &GlobalStateManager<
-            Self,
-            impl MoveBehaviour<f64, 2>,
-            impl PropagationModel<f64, 2, P = P>,
-            f64,
-            2,
-        >,
-        incoming_packets: &Vec<Arc<dyn manetsim::packets::Packet<f64, 2>>>,
-    ) -> Self {
-        trace!(
-            "Node {} received packets {:?}",
-            node_data.id, incoming_packets
-        );
-        let mut counter = packet_counter.lock().unwrap();
-        *counter += incoming_packets.len();
-        Self {}
-    }
-}
-
-lazy_static! {
-    static ref packet_counter: Mutex<usize> = Mutex::new(0);
-}
+use common::behaviours::{LoggerNode, packet_counter};
 
 #[test]
 fn ten_ticks_random_walk() {
@@ -113,7 +86,7 @@ fn ten_ticks_random_walk() {
     }
 
     let ctr = packet_counter.lock().unwrap();
-    assert_eq!(*ctr, 89);
+    assert_eq!(*ctr, 42);
 
     assert!(
         sim_manager

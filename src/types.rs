@@ -73,6 +73,7 @@ pub trait Coord<const K: usize>:
     + LeafSliceFloat<u32>
     + SampleUniform
     + Sized
+    + Clone
 {
 }
 
@@ -99,6 +100,14 @@ impl<
     P: PropagationParams<A, K>,
 > Node<NB, MB, P, A, K>
 {
+    pub fn node_behaviour(&self) -> &NB {
+        &self.behaviour
+    }
+
+    pub fn move_behaviour(&self) -> &MB {
+        &self.move_behaviour
+    }
+
     fn tick_behaviour<PM>(
         self,
         global_state_manager: &GlobalStateManager<NB, MB, PM, A, K>,
@@ -261,15 +270,33 @@ impl<
                 .collect(),
             None => self
                 .tree
-                .within::<SquaredEuclidean>(
+                .within_unsorted::<SquaredEuclidean>(
                     &transmitter.position,
-                    transmitter.propagation_params.prune_distance(),
+                    transmitter
+                        .propagation_params
+                        .prune_distance()
+                        .powf(A::from(2.0).unwrap()),
                 )
                 .iter()
-                .map(|x| unsafe { &self.nodes.get_unchecked(x.item as usize).data.id })
+                .filter_map(|x| unsafe {
+                    let data = &self.nodes.get_unchecked(x.item as usize).data;
+                    if data.id == transmitter.id {
+                        return None;
+                    };
+                    if self.propagation_model.signal_received(transmitter, &data) {
+                        Some(&data.id)
+                    } else {
+                        None
+                    }
+                })
                 .collect(),
         };
 
+        trace!(
+            "{} potential recipients within {:?}",
+            recipients.len(),
+            transmitter.propagation_params.prune_distance()
+        );
         let packet = Arc::new(packet);
         for recipient in recipients {
             let mutex = unsafe { self.new_packets.get(recipient).unwrap_unchecked() };

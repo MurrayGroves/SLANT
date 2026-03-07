@@ -1,0 +1,74 @@
+mod common;
+use common::behaviours::{Monotonic, StaticMovement};
+use manetsim::propagation_models::{FreeSpace, FreeSpaceParams};
+use manetsim::types::{NodeInit, SimManager};
+
+#[test]
+fn free_space() {
+    env_logger::init();
+
+    let nodes = vec![
+        NodeInit {
+            starting_position: [0.0, 0.0],
+            node_behaviour: Monotonic::new(5),
+            move_behaviour: StaticMovement {},
+            propagation_params: FreeSpaceParams::new(
+                8.0,
+                0.34538301613, // 868mhz in metres
+                |_, _| 11.0,   // Omnidirectional
+                0.0,
+                |_, _| 0.0, // Omnidirectional
+                -90.0,
+            ),
+        },
+        NodeInit {
+            starting_position: [6_000.0, 0.0], // 6km
+            node_behaviour: Monotonic::new(5),
+            move_behaviour: StaticMovement {},
+            propagation_params: FreeSpaceParams::new(
+                8.0,
+                0.34538301613, // 868mhz in metres
+                |_, _| 11.0,   // Omnidirectional
+                0.0,
+                |_, _| 0.0, // Omnidirectional
+                -90.0,
+            ),
+        },
+        NodeInit {
+            starting_position: [12_000.0, 0.0], // 12km
+            node_behaviour: Monotonic::new(5),
+            move_behaviour: StaticMovement {},
+            propagation_params: FreeSpaceParams::new(
+                8.0,
+                0.34538301613, // 868mhz in metres
+                |_, _| 11.0,   // Omnidirectional
+                0.0,
+                |_, _| 0.0, // Omnidirectional
+                -90.0,
+            ),
+        },
+    ];
+
+    let mut sim_manager = SimManager::new(nodes, 2138717, FreeSpace);
+
+    sim_manager = sim_manager.n_ticks(11);
+
+    assert_eq!(
+        sim_manager.global_state_manager.nodes()[0]
+            .node_behaviour()
+            .received_packets,
+        2
+    );
+    assert_eq!(
+        sim_manager.global_state_manager.nodes()[2]
+            .node_behaviour()
+            .received_packets,
+        2
+    );
+    assert_eq!(
+        sim_manager.global_state_manager.nodes()[1]
+            .node_behaviour()
+            .received_packets,
+        4
+    );
+}
