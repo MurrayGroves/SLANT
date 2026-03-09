@@ -6,4 +6,5 @@ pub mod types;
 pub mod example_behaviours;
 pub mod packets;
 pub mod propagation_models;
+mod stats;
 pub mod traffic_generators;

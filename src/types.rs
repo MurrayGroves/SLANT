@@ -143,6 +143,7 @@ impl<
     }
 }
 
+/// Holds the state of the simulation at a specific tick
 pub struct GlobalStateManager<
     NB: NodeBehaviour<A, K>,
     MB: MoveBehaviour<A, K>,
@@ -151,7 +152,8 @@ pub struct GlobalStateManager<
     const K: usize,
 > {
     pub(crate) nodes: Arc<Vec<Node<NB, MB, PM::P, A, K>>>,
-    /// 32 is the bucket size, might be worth profiling different values (see https://github.com/sdd/kiddo/blob/20560517c7e06d71a6887a7662b89b70091ef8db/examples/cities.rs#L96)
+    // 32 is the bucket size, might be worth profiling different values (see https://github.com/sdd/kiddo/blob/20560517c7e06d71a6887a7662b89b70091ef8db/examples/cities.rs#L96)
+    /// KD Tree storing all nodes by position, allows for efficient spatial lookup
     tree: Arc<ImmutableKdTree<A, u32, K, 32>>,
     /// Packets that have been sent to each node in the previous tick.
     incoming_packets: Arc<HashMap<NodeID, Vec<Arc<dyn Packet<A, K>>>>>,
