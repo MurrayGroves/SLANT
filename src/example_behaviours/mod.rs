@@ -1,6 +1,7 @@
 use crate::propagation_models::{PropagationModel, PropagationParams};
 use crate::types::{
-    Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, NodeID, SimManager,
+    Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, NodeID, SimConfig,
+    SimManager,
 };
 use num_traits::Float;
 
@@ -22,16 +23,10 @@ impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> RandomWalk<CHANGE_DELA
 impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> MoveBehaviour<A, K>
     for RandomWalk<CHANGE_DELAY, A, K>
 {
-    fn tick<P: PropagationParams<A, K>>(
+    fn tick<C: SimConfig<A, K>>(
         self,
-        data: &NodeData<A, K, P>,
-        global_state_manager: &GlobalStateManager<
-            impl NodeBehaviour<A, K>,
-            Self,
-            impl PropagationModel<A, K, P = P>,
-            A,
-            K,
-        >,
+        data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
+        global_state_manager: &GlobalStateManager<A, K, C>,
     ) -> (Self, [A; K]) {
         let mut position = data.position;
         let mut direction = self.direction;

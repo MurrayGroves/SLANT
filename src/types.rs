@@ -1,9 +1,11 @@
 use crate::packets::Packet;
 use crate::propagation_models::{PropagationModel, PropagationParams, SimpleDistanceParams};
+use crate::stats::TimestepStats;
 use kiddo::SquaredEuclidean;
 use kiddo::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::traits::Content;
+use linearize::Linearize;
 use log::trace;
 use num_traits::Float;
 use num_traits::float::FloatCore;
@@ -16,34 +18,33 @@ use std::cell::SyncUnsafeCell;
 use std::collections::HashMap;
 use std::iter::Sum;
 use std::sync::{Arc, Mutex};
+use thread_local::ThreadLocal;
+
+pub trait SimConfig<A: Coord<K>, const K: usize>
+where
+    <Self::S as Linearize>::Storage<isize>: Send,
+{
+    type MB: MoveBehaviour<A, K>;
+    type NB: NodeBehaviour<A, K>;
+    type PM: PropagationModel<A, K>;
+    type S: Linearize;
+}
 
 /// Describes a node behaviour which performs some processing each tick to produce a new node behaviour
 pub trait NodeBehaviour<A: Coord<K>, const K: usize>: Sized + Send + Sync + Clone {
-    fn tick<P: PropagationParams<A, K>>(
+    fn tick<C: SimConfig<A, K, NB = Self>>(
         self,
-        node_data: &NodeData<A, K, P>,
-        global_state_manager: &GlobalStateManager<
-            Self,
-            impl MoveBehaviour<A, K>,
-            impl PropagationModel<A, K, P = P>,
-            A,
-            K,
-        >,
+        node_data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
+        global_state_manager: &GlobalStateManager<A, K, C>,
         incoming_packets: &Vec<Arc<dyn Packet<A, K>>>,
     ) -> Self;
 }
 
 pub trait MoveBehaviour<A: Coord<K>, const K: usize>: Sized + Send + Sync + Clone {
-    fn tick<P: PropagationParams<A, K>>(
+    fn tick<C: SimConfig<A, K>>(
         self,
-        data: &NodeData<A, K, P>,
-        global_state_manager: &GlobalStateManager<
-            impl NodeBehaviour<A, K>,
-            Self,
-            impl PropagationModel<A, K, P = P>,
-            A,
-            K,
-        >,
+        data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
+        global_state_manager: &GlobalStateManager<A, K, C>,
     ) -> (Self, [A; K]);
 }
 
@@ -108,9 +109,9 @@ impl<
         &self.move_behaviour
     }
 
-    fn tick_behaviour<PM>(
+    fn tick_behaviour<PM, C: SimConfig<A, K, PM = PM, NB = NB>>(
         self,
-        global_state_manager: &GlobalStateManager<NB, MB, PM, A, K>,
+        global_state_manager: &GlobalStateManager<A, K, C>,
         incoming_packets: &Vec<Arc<dyn Packet<A, K>>>,
     ) -> Self
     where
@@ -125,9 +126,9 @@ impl<
         }
     }
 
-    fn tick_movement<PM: PropagationModel<A, K, P = P>>(
+    fn tick_movement<PM: PropagationModel<A, K, P = P>, C: SimConfig<A, K, PM = PM>>(
         self,
-        global_state_manager: &GlobalStateManager<NB, MB, PM, A, K>,
+        global_state_manager: &GlobalStateManager<A, K, C>,
     ) -> Self {
         let mut new = self.clone();
         let (move_behaviour, position) = self.move_behaviour.tick(&self.data, global_state_manager);
@@ -144,14 +145,8 @@ impl<
 }
 
 /// Holds the state of the simulation at a specific tick
-pub struct GlobalStateManager<
-    NB: NodeBehaviour<A, K>,
-    MB: MoveBehaviour<A, K>,
-    PM: PropagationModel<A, K>,
-    A: Coord<K>,
-    const K: usize,
-> {
-    pub(crate) nodes: Arc<Vec<Node<NB, MB, PM::P, A, K>>>,
+pub struct GlobalStateManager<A: Coord<K>, const K: usize, C: SimConfig<A, K>> {
+    pub(crate) nodes: Arc<Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>>>,
     // 32 is the bucket size, might be worth profiling different values (see https://github.com/sdd/kiddo/blob/20560517c7e06d71a6887a7662b89b70091ef8db/examples/cities.rs#L96)
     /// KD Tree storing all nodes by position, allows for efficient spatial lookup
     tree: Arc<ImmutableKdTree<A, u32, K, 32>>,
@@ -160,22 +155,17 @@ pub struct GlobalStateManager<
     /// Packets that have been sent to each node during this tick.
     new_packets: Arc<HashMap<NodeID, Mutex<Vec<Arc<dyn Packet<A, K>>>>>>,
     rngs: Arc<Vec<SyncUnsafeCell<Xoshiro256Plus>>>,
-    propagation_model: PM,
+    propagation_model: C::PM,
+    /// Thread-local stats
+    stats: Arc<ThreadLocal<TimestepStats<C::S>>>,
 }
 
-impl<
-    NB: NodeBehaviour<A, K>,
-    MB: MoveBehaviour<A, K>,
-    PM: PropagationModel<A, K>,
-    A: Coord<K>,
-    const K: usize,
-> GlobalStateManager<NB, MB, PM, A, K>
-{
+impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C> {
     fn new(
-        nodes: Vec<Node<NB, MB, PM::P, A, K>>,
+        nodes: Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>>,
         seed: u64,
-        propagation_model: PM,
-    ) -> GlobalStateManager<NB, MB, PM, A, K> {
+        propagation_model: C::PM,
+    ) -> GlobalStateManager<A, K, C> {
         Self {
             tree: Arc::new(ImmutableKdTree::new_from_slice(
                 nodes
@@ -197,30 +187,29 @@ impl<
             ),
             nodes: Arc::new(nodes),
             propagation_model,
+            stats: Arc::new(ThreadLocal::new()),
         }
     }
 
-    pub fn nodes(&self) -> &Vec<Node<NB, MB, PM::P, A, K>> {
+    pub fn nodes(&self) -> &Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> {
         &self.nodes
     }
 }
 
-impl<
-    NB: NodeBehaviour<A, K>,
-    MB: MoveBehaviour<A, K>,
-    PM: PropagationModel<A, K>,
-    A: Coord<K>,
-    const K: usize,
-> GlobalStateManager<NB, MB, PM, A, K>
-{
+impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C> {
     fn tick(self) -> Self {
-        let nodes: Vec<Node<NB, MB, PM::P, A, K>> = (*self.nodes)
+        let nodes: Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> = (*self
+            .nodes)
             .clone()
             .into_par_iter()
-            .map(|x: Node<NB, MB, PM::P, A, K>| x.tick_movement(&self))
+            .map(
+                |x: Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>| {
+                    x.tick_movement(&self)
+                },
+            )
             .collect();
 
-        let nodes: Vec<Node<NB, MB, PM::P, A, K>> = nodes
+        let nodes: Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> = nodes
             .into_par_iter()
             .map(|x| {
                 let packets = self.incoming_packets.get(&x.data.id).unwrap();
@@ -253,12 +242,13 @@ impl<
             rngs: self.rngs,
             nodes: Arc::new(nodes),
             propagation_model: self.propagation_model,
+            stats: Arc::new(ThreadLocal::new()),
         }
     }
 
     pub fn transmit_packet(
         &self,
-        transmitter: &NodeData<A, K, PM::P>,
+        transmitter: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
         packet: impl Packet<A, K> + 'static,
     ) {
         let eager_targets = packet.eager_targets();
@@ -321,28 +311,15 @@ impl<
     }
 }
 
-pub struct SimManager<
-    NB: NodeBehaviour<A, K>,
-    MB: MoveBehaviour<A, K>,
-    PM: PropagationModel<A, K>,
-    A: Coord<K>,
-    const K: usize,
-> {
-    pub global_state_manager: GlobalStateManager<NB, MB, PM, A, K>,
+pub struct SimManager<A: Coord<K>, const K: usize, C: SimConfig<A, K>> {
+    pub global_state_manager: GlobalStateManager<A, K, C>,
 }
 
-impl<
-    NB: NodeBehaviour<A, K>,
-    MB: MoveBehaviour<A, K>,
-    PM: PropagationModel<A, K>,
-    A: Coord<K>,
-    const K: usize,
-> SimManager<NB, MB, PM, A, K>
-{
+impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
     pub fn new(
-        nodes: Vec<NodeInit<NB, MB, PM::P, A, K>>,
+        nodes: Vec<NodeInit<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>>,
         seed: u64,
-        propagation_model: PM,
+        propagation_model: C::PM,
     ) -> Self {
         let nodes = nodes
             .into_iter()

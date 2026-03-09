@@ -1,21 +1,14 @@
 use crate::packets::{MulticastPacket, UnicastPacket};
 use crate::propagation_models::PropagationModel;
-use crate::types::{Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeID};
+use crate::types::{Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeID, SimConfig};
 
 pub fn mixed_multicast_and_random_target_unicast<
-    NodeBehaviourType: NodeBehaviour<A, K>,
-    MoveBehaviourType: MoveBehaviour<A, K>,
     A: Coord<K>,
     const K: usize,
+    C: SimConfig<A, K>,
 >(
     rng: &mut impl rand::Rng,
-    global_state_manager: &GlobalStateManager<
-        NodeBehaviourType,
-        MoveBehaviourType,
-        impl PropagationModel<A, K>,
-        A,
-        K,
-    >,
+    global_state_manager: &GlobalStateManager<A, K, C>,
     num_multicast: usize,
     num_unicast: usize,
 ) {
