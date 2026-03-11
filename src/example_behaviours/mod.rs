@@ -1,3 +1,5 @@
+mod flood;
+
 use crate::propagation_models::{PropagationModel, PropagationParams};
 use crate::types::{
     Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, NodeID, SimConfig,

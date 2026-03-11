@@ -32,6 +32,8 @@ where
 
 /// Describes a node behaviour which performs some processing each tick to produce a new node behaviour
 pub trait NodeBehaviour<A: Coord<K>, const K: usize>: Sized + Send + Sync + Clone {
+    type PT: Packet<A, K>;
+
     fn tick<C: SimConfig<A, K, NB = Self>>(
         self,
         node_data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
