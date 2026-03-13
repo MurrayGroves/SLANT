@@ -2,20 +2,25 @@ use lazy_static::lazy_static;
 use log::trace;
 use manetsim::packets::{MulticastPacket, Packet};
 use manetsim::propagation_models::{PropagationModel, PropagationParams};
-use manetsim::types::{GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, SimConfig};
+use manetsim::types::{
+    Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, SimConfig,
+};
 use num_traits::ToPrimitive;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
-pub struct Monotonic {
+pub struct Monotonic<P: Packet<f32, 2> + Clone> {
+    packet_type: PhantomData<P>,
     pub ticks_per_packet: usize,
     counter: usize,
     pub received_packets: usize,
 }
 
-impl Monotonic {
+impl<P: Packet<f32, 2> + Clone> Monotonic<P> {
     pub fn new(ticks_per_packet: usize) -> Self {
         Monotonic {
+            packet_type: Default::default(),
             ticks_per_packet,
             counter: 0,
             received_packets: 0,
@@ -23,10 +28,14 @@ impl Monotonic {
     }
 }
 
-impl NodeBehaviour<f32, 2> for Monotonic {
-    type P = dyn Packet<f32, 2>;
+pub trait TestablePacket<A: Coord<K>, const K: usize>: Packet<A, K> {
+    fn new(content: Box<[u8]>) -> Self;
+}
 
-    fn tick<C: SimConfig<f32, 2, NB = Self>>(
+impl<P: TestablePacket<f32, 2> + Clone> NodeBehaviour<f32, 2> for Monotonic<P> {
+    type P = P;
+
+    fn tick<C: SimConfig<f32, 2, NB = impl NodeBehaviour<f32, 2, P = Self::P>>>(
         mut self,
         node_data: &NodeData<f32, 2, <C::PM as PropagationModel<f32, 2>>::P>,
         global_state_manager: &GlobalStateManager<f32, 2, C>,
@@ -44,9 +53,7 @@ impl NodeBehaviour<f32, 2> for Monotonic {
         if self.counter % self.ticks_per_packet == 0 {
             global_state_manager.transmit_packet(
                 node_data,
-                Box::new(MulticastPacket {
-                    content: Box::new([node_data.id.to_u8().unwrap()]),
-                }),
+                Box::new(P::new(Box::new([node_data.id.to_u8().unwrap()]))),
             )
         }
 
@@ -74,7 +81,7 @@ pub struct LoggerNode {}
 impl NodeBehaviour<f64, 2> for LoggerNode {
     type P = dyn Packet<f64, 2>;
 
-    fn tick<C: SimConfig<f64, 2, NB = Self>>(
+    fn tick<C: SimConfig<f64, 2, NB = impl NodeBehaviour<f64, 2, P = Self::P>>>(
         self,
         node_data: &NodeData<f64, 2, <C::PM as PropagationModel<f64, 2>>::P>,
         global_state_manager: &GlobalStateManager<f64, 2, C>,

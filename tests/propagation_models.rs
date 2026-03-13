@@ -1,7 +1,9 @@
 mod common;
+use crate::common::behaviours::TestablePacket;
 use common::behaviours::{Monotonic, StaticMovement};
-use manetsim::propagation_models::{FreeSpace, FreeSpaceParams};
-use manetsim::types::{NodeInit, SimConfig, SimManager};
+use manetsim::packets::{MulticastPacket, Packet};
+use manetsim::propagation_models::{FreeSpace, FreeSpaceParams, PropagationParams};
+use manetsim::types::{NodeData, NodeID, NodeInit, SimConfig, SimManager};
 
 #[test]
 fn free_space() {
@@ -49,10 +51,42 @@ fn free_space() {
         },
     ];
 
+    #[derive(Clone, Debug)]
+    struct MulticastTestPacket {
+        content: Box<[u8]>,
+    };
+
+    impl Packet<f32, 2> for MulticastTestPacket {
+        fn content(self) -> Box<[u8]> {
+            self.content
+        }
+
+        fn content_ref(&self) -> &Box<[u8]> {
+            &self.content
+        }
+
+        fn eager_targets(&self) -> Option<Vec<NodeID>> {
+            None
+        }
+
+        fn targets<P: PropagationParams<f32, 2>>(&self, target: &NodeData<f32, 2, P>) -> bool
+        where
+            Self: Sized,
+        {
+            true
+        }
+    }
+
+    impl TestablePacket<f32, 2> for MulticastTestPacket {
+        fn new(content: Box<[u8]>) -> Self {
+            Self { content }
+        }
+    }
+
     struct TestSimConfig;
     impl SimConfig<f32, 2> for TestSimConfig {
         type MB = StaticMovement;
-        type NB = Monotonic;
+        type NB = Monotonic<MulticastTestPacket>;
         type PM = FreeSpace;
         type S = ();
     }

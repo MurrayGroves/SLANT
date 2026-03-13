@@ -1,4 +1,4 @@
-mod flood;
+pub mod flood;
 
 use crate::propagation_models::{PropagationModel, PropagationParams};
 use crate::types::{

@@ -95,14 +95,15 @@ pub trait OriginatedPacket<A: Coord<K>, const K: usize>: Packet<A, K> {
 
 /// A packet that can provide a sequence number uniquely identifying this packet w.r.t its originator
 pub trait LocallySequencedPacket<A: Coord<K>, const K: usize>: OriginatedPacket<A, K> {
-    type T: Num + Send + Sync + Clone + Eq + Hash;
-    fn seq(&self) -> Self::T;
+    type S: Num + Send + Sync + Clone + Eq + Hash;
+    fn seq(&self) -> Self::S;
 }
 
 /// A packet that can provide a sequence number uniquely identifying this packet globally.
 /// If your packet implements [LocallySequencedPacket], you should probably just implement
 /// this as a concatenation of the originator and the local sequence number.
 pub trait GloballySequencedPacket<A: Coord<K>, const K: usize>: Packet<A, K> {
-    type T: Num + Send + Sync + Clone + Eq + Hash;
-    fn seq(&self) -> Self::T;
+    /// Type for sequence number
+    type S: Num + Send + Sync + Clone + Eq + Hash;
+    fn seq(&self) -> Self::S;
 }
