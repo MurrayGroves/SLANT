@@ -1,8 +1,12 @@
 use crate::propagation_models::PropagationParams;
 use crate::types::{Coord, NodeData, NodeID};
+use dyn_clone::DynClone;
 use num_traits::Num;
 use std::fmt::{Debug, Formatter};
+use std::hash::Hash;
+use std::ops::Deref;
 
+#[derive(Clone)]
 pub struct UnicastPacket {
     pub target: NodeID,
     pub content: Box<[u8]>,
@@ -32,6 +36,7 @@ impl Debug for UnicastPacket {
     }
 }
 
+#[derive(Clone)]
 pub struct MulticastPacket {
     pub content: Box<[u8]>,
 }
@@ -60,7 +65,7 @@ impl Debug for MulticastPacket {
     }
 }
 
-pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync {
+pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync + DynClone {
     fn content(self) -> Box<[u8]>;
 
     fn content_ref(&self) -> &Box<[u8]>;
@@ -76,6 +81,12 @@ pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync {
         Self: Sized;
 }
 
+impl<A: Coord<K>, const K: usize> Clone for Box<dyn Packet<A, K>> {
+    fn clone(&self) -> Self {
+        dyn_clone::clone_box(&**self)
+    }
+}
+
 /// A packet that can provide the ID of the node which originated it
 pub trait OriginatedPacket<A: Coord<K>, const K: usize>: Packet<A, K> {
     /// Get ID of node which originated this packet
@@ -84,7 +95,7 @@ pub trait OriginatedPacket<A: Coord<K>, const K: usize>: Packet<A, K> {
 
 /// A packet that can provide a sequence number uniquely identifying this packet w.r.t its originator
 pub trait LocallySequencedPacket<A: Coord<K>, const K: usize>: OriginatedPacket<A, K> {
-    type T: Num + Send;
+    type T: Num + Send + Sync + Clone + Eq + Hash;
     fn seq(&self) -> Self::T;
 }
 
@@ -92,6 +103,6 @@ pub trait LocallySequencedPacket<A: Coord<K>, const K: usize>: OriginatedPacket<
 /// If your packet implements [LocallySequencedPacket], you should probably just implement
 /// this as a concatenation of the originator and the local sequence number.
 pub trait GloballySequencedPacket<A: Coord<K>, const K: usize>: Packet<A, K> {
-    type T: Num + Send;
+    type T: Num + Send + Sync + Clone + Eq + Hash;
     fn seq(&self) -> Self::T;
 }

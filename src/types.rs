@@ -1,6 +1,7 @@
 use crate::packets::Packet;
 use crate::propagation_models::{PropagationModel, PropagationParams, SimpleDistanceParams};
 use crate::stats::TimestepStats;
+use dyn_clone::DynClone;
 use kiddo::SquaredEuclidean;
 use kiddo::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
@@ -27,23 +28,23 @@ where
     type MB: MoveBehaviour<A, K>;
     type NB: NodeBehaviour<A, K>;
     type PM: PropagationModel<A, K>;
+    /// Key type for stored stats
     type S: Linearize;
 }
 
 /// Describes a node behaviour which performs some processing each tick to produce a new node behaviour
 pub trait NodeBehaviour<A: Coord<K>, const K: usize>: Sized + Send + Sync + Clone {
-    type PT: Packet<A, K>;
-
+    type P: Packet<A, K> + ?Sized;
     fn tick<C: SimConfig<A, K, NB = Self>>(
         self,
         node_data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
         global_state_manager: &GlobalStateManager<A, K, C>,
-        incoming_packets: &Vec<Arc<dyn Packet<A, K>>>,
+        incoming_packets: &Vec<Box<Self::P>>,
     ) -> Self;
 }
 
 pub trait MoveBehaviour<A: Coord<K>, const K: usize>: Sized + Send + Sync + Clone {
-    fn tick<C: SimConfig<A, K>>(
+    fn tick<C: SimConfig<A, K, MB = Self>>(
         self,
         data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
         global_state_manager: &GlobalStateManager<A, K, C>,
@@ -114,7 +115,7 @@ impl<
     fn tick_behaviour<PM, C: SimConfig<A, K, PM = PM, NB = NB>>(
         self,
         global_state_manager: &GlobalStateManager<A, K, C>,
-        incoming_packets: &Vec<Arc<dyn Packet<A, K>>>,
+        incoming_packets: &Vec<Box<NB::P>>,
     ) -> Self
     where
         PM: PropagationModel<A, K, P = P>,
@@ -128,7 +129,10 @@ impl<
         }
     }
 
-    fn tick_movement<PM: PropagationModel<A, K, P = P>, C: SimConfig<A, K, PM = PM>>(
+    fn tick_movement<
+        PM: PropagationModel<A, K, P = P>,
+        C: SimConfig<A, K, PM = PM, MB = MB, NB = NB>,
+    >(
         self,
         global_state_manager: &GlobalStateManager<A, K, C>,
     ) -> Self {
@@ -153,9 +157,9 @@ pub struct GlobalStateManager<A: Coord<K>, const K: usize, C: SimConfig<A, K>> {
     /// KD Tree storing all nodes by position, allows for efficient spatial lookup
     tree: Arc<ImmutableKdTree<A, u32, K, 32>>,
     /// Packets that have been sent to each node in the previous tick.
-    incoming_packets: Arc<HashMap<NodeID, Vec<Arc<dyn Packet<A, K>>>>>,
+    incoming_packets: Arc<HashMap<NodeID, Vec<Box<<C::NB as NodeBehaviour<A, K>>::P>>>>,
     /// Packets that have been sent to each node during this tick.
-    new_packets: Arc<HashMap<NodeID, Mutex<Vec<Arc<dyn Packet<A, K>>>>>>,
+    new_packets: Arc<HashMap<NodeID, Mutex<Vec<Box<<C::NB as NodeBehaviour<A, K>>::P>>>>>,
     rngs: Arc<Vec<SyncUnsafeCell<Xoshiro256Plus>>>,
     propagation_model: C::PM,
     /// Thread-local stats
@@ -251,7 +255,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
     pub fn transmit_packet(
         &self,
         transmitter: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
-        packet: impl Packet<A, K> + 'static,
+        packet: Box<<C::NB as NodeBehaviour<A, K>>::P>,
     ) {
         let eager_targets = packet.eager_targets();
         let recipients: Vec<&NodeID> = match &eager_targets {
@@ -291,11 +295,10 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
             recipients.len(),
             transmitter.propagation_params.prune_distance()
         );
-        let packet = Arc::new(packet);
         for recipient in recipients {
             let mutex = unsafe { self.new_packets.get(recipient).unwrap_unchecked() };
             let mut packets = mutex.lock().unwrap();
-            packets.push(packet.clone());
+            packets.push(dyn_clone::clone_box(&packet));
         }
     }
 

@@ -1,7 +1,7 @@
 mod common;
 use common::behaviours::{Monotonic, StaticMovement};
 use manetsim::propagation_models::{FreeSpace, FreeSpaceParams};
-use manetsim::types::{NodeInit, SimManager};
+use manetsim::types::{NodeInit, SimConfig, SimManager};
 
 #[test]
 fn free_space() {
@@ -49,7 +49,16 @@ fn free_space() {
         },
     ];
 
-    let mut sim_manager = SimManager::new(nodes, 2138717, FreeSpace);
+    struct TestSimConfig;
+    impl SimConfig<f32, 2> for TestSimConfig {
+        type MB = StaticMovement;
+        type NB = Monotonic;
+        type PM = FreeSpace;
+        type S = ();
+    }
+
+    let mut sim_manager: SimManager<f32, 2, TestSimConfig> =
+        SimManager::new(nodes, 2138717, FreeSpace);
 
     sim_manager = sim_manager.n_ticks(11);
 

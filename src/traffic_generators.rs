@@ -1,24 +1,22 @@
-use crate::packets::{MulticastPacket, UnicastPacket};
+use crate::packets::{MulticastPacket, Packet, UnicastPacket};
 use crate::propagation_models::PropagationModel;
 use crate::types::{Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeID, SimConfig};
 
-pub fn mixed_multicast_and_random_target_unicast<
-    A: Coord<K>,
-    const K: usize,
-    C: SimConfig<A, K>,
->(
+pub fn mixed_multicast_and_random_target_unicast<A: Coord<K>, const K: usize, C: SimConfig<A, K>>(
     rng: &mut impl rand::Rng,
     global_state_manager: &GlobalStateManager<A, K, C>,
     num_multicast: usize,
     num_unicast: usize,
-) {
+) where
+    C::NB: NodeBehaviour<A, K, P = dyn Packet<A, K>>,
+{
     for _ in 0..num_multicast {
         let index = rng.random_range(0..global_state_manager.nodes.len());
         let mut bytes: [u8; 32] = [0; 32];
         rng.fill(&mut bytes);
-        let packet = MulticastPacket {
+        let packet = Box::new(MulticastPacket {
             content: Box::new(bytes),
-        };
+        });
         global_state_manager.transmit_packet(&global_state_manager.nodes[index].data, packet)
     }
 
@@ -31,6 +29,7 @@ pub fn mixed_multicast_and_random_target_unicast<
             content: Box::new(bytes),
             target: target_id,
         };
-        global_state_manager.transmit_packet(&global_state_manager.nodes[index].data, packet)
+        global_state_manager
+            .transmit_packet(&global_state_manager.nodes[index].data, Box::new(packet))
     }
 }

@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use log::trace;
 use manetsim::packets::{MulticastPacket, Packet};
 use manetsim::propagation_models::{PropagationModel, PropagationParams};
-use manetsim::types::{GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData};
+use manetsim::types::{GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, SimConfig};
 use num_traits::ToPrimitive;
 use std::sync::{Arc, Mutex};
 
@@ -24,17 +24,13 @@ impl Monotonic {
 }
 
 impl NodeBehaviour<f32, 2> for Monotonic {
-    fn tick<P: PropagationParams<f32, 2>>(
+    type P = dyn Packet<f32, 2>;
+
+    fn tick<C: SimConfig<f32, 2, NB = Self>>(
         mut self,
-        node_data: &NodeData<f32, 2, P>,
-        global_state_manager: &GlobalStateManager<
-            Self,
-            impl MoveBehaviour<f32, 2>,
-            impl PropagationModel<f32, 2, P = P>,
-            f32,
-            2,
-        >,
-        incoming_packets: &Vec<Arc<dyn Packet<f32, 2>>>,
+        node_data: &NodeData<f32, 2, <C::PM as PropagationModel<f32, 2>>::P>,
+        global_state_manager: &GlobalStateManager<f32, 2, C>,
+        incoming_packets: &Vec<Box<Self::P>>,
     ) -> Self {
         trace!("Ticking {}", node_data.id);
         self.received_packets += incoming_packets.len();
@@ -48,9 +44,9 @@ impl NodeBehaviour<f32, 2> for Monotonic {
         if self.counter % self.ticks_per_packet == 0 {
             global_state_manager.transmit_packet(
                 node_data,
-                MulticastPacket {
+                Box::new(MulticastPacket {
                     content: Box::new([node_data.id.to_u8().unwrap()]),
-                },
+                }),
             )
         }
 
@@ -62,16 +58,10 @@ impl NodeBehaviour<f32, 2> for Monotonic {
 pub struct StaticMovement {}
 
 impl MoveBehaviour<f32, 2> for StaticMovement {
-    fn tick<P: PropagationParams<f32, 2>>(
+    fn tick<C: SimConfig<f32, 2, MB = Self>>(
         self,
-        data: &NodeData<f32, 2, P>,
-        global_state_manager: &GlobalStateManager<
-            impl NodeBehaviour<f32, 2>,
-            Self,
-            impl PropagationModel<f32, 2, P = P>,
-            f32,
-            2,
-        >,
+        data: &NodeData<f32, 2, <C::PM as PropagationModel<f32, 2>>::P>,
+        global_state_manager: &GlobalStateManager<f32, 2, C>,
     ) -> (Self, [f32; 2]) {
         (self, data.position)
     }
@@ -82,17 +72,13 @@ impl MoveBehaviour<f32, 2> for StaticMovement {
 pub struct LoggerNode {}
 
 impl NodeBehaviour<f64, 2> for LoggerNode {
-    fn tick<P: PropagationParams<f64, 2>>(
+    type P = dyn Packet<f64, 2>;
+
+    fn tick<C: SimConfig<f64, 2, NB = Self>>(
         self,
-        node_data: &NodeData<f64, 2, P>,
-        global_state_manager: &GlobalStateManager<
-            Self,
-            impl MoveBehaviour<f64, 2>,
-            impl PropagationModel<f64, 2, P = P>,
-            f64,
-            2,
-        >,
-        incoming_packets: &Vec<Arc<dyn manetsim::packets::Packet<f64, 2>>>,
+        node_data: &NodeData<f64, 2, <C::PM as PropagationModel<f64, 2>>::P>,
+        global_state_manager: &GlobalStateManager<f64, 2, C>,
+        incoming_packets: &Vec<Box<Self::P>>,
     ) -> Self {
         trace!(
             "Node {} received packets {:?}",

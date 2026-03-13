@@ -8,7 +8,8 @@ use manetsim::propagation_models::{
 };
 use manetsim::traffic_generators::mixed_multicast_and_random_target_unicast;
 use manetsim::types::{
-    GlobalStateManager, MoveBehaviour, Node, NodeBehaviour, NodeData, NodeInit, SimManager,
+    Coord, GlobalStateManager, MoveBehaviour, Node, NodeBehaviour, NodeData, NodeInit, SimConfig,
+    SimManager,
 };
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
@@ -73,7 +74,16 @@ fn ten_ticks_random_walk() {
         },
     ];
 
-    let mut sim_manager = SimManager::new(nodes.clone(), 123, prop_model);
+    struct TestSimConfig;
+    impl SimConfig<f64, 2> for TestSimConfig {
+        type MB = RandomWalk<2, f64, 2>;
+        type NB = LoggerNode;
+        type PM = SimpleDistance;
+        type S = ();
+    }
+
+    let mut sim_manager: SimManager<_, _, TestSimConfig> =
+        SimManager::new(nodes.clone(), 123, prop_model);
     let mut rng = Xoshiro256Plus::seed_from_u64(123456);
     for _ in 0..10 {
         mixed_multicast_and_random_target_unicast(
