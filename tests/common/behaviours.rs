@@ -65,7 +65,6 @@ impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet<A, K> +
             node_data.id,
             incoming_packets.iter().map(|x| x.content_ref()[0])
         );
-        self.counter += 1;
 
         if self.counter % self.ticks_per_packet == 0 {
             global_state_manager.transmit_packet(
@@ -73,6 +72,8 @@ impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet<A, K> +
                 (self.gen_packet)(node_data, Box::new(node_data.id.to_be_bytes())),
             )
         }
+
+        self.counter += 1;
 
         self
     }

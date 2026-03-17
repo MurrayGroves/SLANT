@@ -1,5 +1,5 @@
 use crate::common::behaviours::{Monotonic, StaticMovement};
-use log::debug;
+use log::{debug, trace};
 use manetsim::example_behaviours::flood::Flood;
 use manetsim::example_behaviours::flood::FloodPacket;
 use manetsim::packets::{GloballySequencedPacket, Packet};
@@ -113,7 +113,7 @@ impl MonotonicFlood {
         let clone = flood.clone();
         Self {
             monotonic: Monotonic::new(
-                20,
+                5,
                 Arc::new(move |data, content| flood.gen_packet(data, content)),
             ),
             flood: clone,
@@ -125,10 +125,13 @@ fn generate_nodes(
     num_nodes: usize,
     gap: f32,
 ) -> Vec<NodeInit<MonotonicFlood, StaticMovement, FreeSpaceParams<f32, 2>, f32, 2>> {
+    let dim = num_nodes.isqrt() + 1;
     let mut nodes = Vec::with_capacity(num_nodes);
     for i in 0..num_nodes {
+        let xy = [(i as f32 / dim as f32) * gap, (i % dim) as f32 * gap];
+        trace!("Spawning at {:?}", xy);
         nodes.push(NodeInit {
-            starting_position: [i as f32 * gap, i as f32 * gap],
+            starting_position: xy,
             node_behaviour: MonotonicFlood::new(),
             move_behaviour: StaticMovement {},
             propagation_params: FreeSpaceParams::new(
