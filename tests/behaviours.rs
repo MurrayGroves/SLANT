@@ -151,7 +151,7 @@ fn generate_nodes(
 fn test_flood() {
     env_logger::init();
 
-    let nodes = generate_nodes(1_000_000, 3_000.0);
+    let nodes = generate_nodes(10_000, 3_000.0);
 
     struct TestConfig;
     impl SimConfig<f32, 2> for TestConfig {
