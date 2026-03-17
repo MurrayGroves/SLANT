@@ -1,4 +1,4 @@
-use crate::common::behaviours::{Monotonic, StaticMovement, TestablePacket};
+use crate::common::behaviours::{Monotonic, StaticMovement};
 use log::debug;
 use manetsim::example_behaviours::flood::Flood;
 use manetsim::example_behaviours::flood::FloodPacket;
@@ -9,6 +9,8 @@ use manetsim::propagation_models::{
 use manetsim::types::{
     Coord, GlobalStateManager, NodeBehaviour, NodeData, NodeID, NodeInit, SimConfig, SimManager,
 };
+use std::ops::BitAnd;
+use std::sync::Arc;
 
 mod common;
 
@@ -16,6 +18,7 @@ mod common;
 struct TestPacket {
     hops: u8,
     seq: u16,
+    src: NodeID,
     content: Box<[u8]>,
 }
 
@@ -44,7 +47,7 @@ impl<A: Coord<K>, const K: usize> GloballySequencedPacket<A, K> for TestPacket {
     type S = u16;
 
     fn seq(&self) -> Self::S {
-        self.seq
+        self.seq.bitand(self.src as Self::S)
     }
 }
 
@@ -58,31 +61,42 @@ impl<A: Coord<K>, const K: usize> FloodPacket<A, K> for TestPacket {
     fn set_hop_count(&mut self, count: <Self as FloodPacket<A, K>>::H) {
         self.hops = count;
     }
-}
 
-impl TestablePacket<f32, 2> for TestPacket {
-    fn new(content: Box<[u8]>) -> Self {
-        TestPacket {
-            hops: 5,
-            seq: 0,
+    fn new(
+        data: &NodeData<A, K, impl PropagationParams<A, K>>,
+        hops: Self::H,
+        seq: Self::S,
+        content: Box<[u8]>,
+    ) -> Self {
+        Self {
+            hops,
+            seq,
             content,
+            src: data.id,
         }
     }
 }
 
 #[derive(Clone)]
 struct MonotonicFlood {
-    monotonic: Monotonic<TestPacket>,
+    monotonic: Monotonic<f32, 2, TestPacket, FreeSpaceParams<f32, 2>>,
     flood: Flood<TestPacket, f32, 2>,
 }
 
-impl NodeBehaviour<f32, 2> for MonotonicFlood {
+impl NodeBehaviour<f32, 2, FreeSpaceParams<f32, 2>> for MonotonicFlood {
     type P = TestPacket;
-    fn tick<C: SimConfig<f32, 2, NB = impl NodeBehaviour<f32, 2, P = Self::P>>>(
+    fn tick<
+        C: SimConfig<
+                f32,
+                2,
+                PM = impl PropagationModel<f32, 2, P = FreeSpaceParams<f32, 2>>,
+                NB = impl NodeBehaviour<f32, 2, FreeSpaceParams<f32, 2>, P = Self::P>,
+            >,
+    >(
         mut self,
         node_data: &NodeData<f32, 2, <<C as SimConfig<f32, 2>>::PM as PropagationModel<f32, 2>>::P>,
         global_state_manager: &GlobalStateManager<f32, 2, C>,
-        packets: &Vec<Box<<Self as NodeBehaviour<f32, 2>>::P>>,
+        packets: &Vec<<Self as NodeBehaviour<f32, 2, FreeSpaceParams<f32, 2>>>::P>,
     ) -> Self {
         self.monotonic = self
             .monotonic
@@ -95,20 +109,26 @@ impl NodeBehaviour<f32, 2> for MonotonicFlood {
 
 impl MonotonicFlood {
     fn new() -> Self {
+        let flood = Flood::new();
+        let clone = flood.clone();
         Self {
-            monotonic: Monotonic::new(20),
-            flood: Flood::new(),
+            monotonic: Monotonic::new(
+                20,
+                Arc::new(move |data, content| flood.gen_packet(data, content)),
+            ),
+            flood: clone,
         }
     }
 }
 
 fn generate_nodes(
     num_nodes: usize,
+    gap: f32,
 ) -> Vec<NodeInit<MonotonicFlood, StaticMovement, FreeSpaceParams<f32, 2>, f32, 2>> {
     let mut nodes = Vec::with_capacity(num_nodes);
     for i in 0..num_nodes {
         nodes.push(NodeInit {
-            starting_position: [i as f32 * 100.0, i as f32 * 100.0],
+            starting_position: [i as f32 * gap, i as f32 * gap],
             node_behaviour: MonotonicFlood::new(),
             move_behaviour: StaticMovement {},
             propagation_params: FreeSpaceParams::new(
@@ -128,7 +148,7 @@ fn generate_nodes(
 fn test_flood() {
     env_logger::init();
 
-    let nodes = generate_nodes(100);
+    let nodes = generate_nodes(1_000_000, 3_000.0);
 
     struct TestConfig;
     impl SimConfig<f32, 2> for TestConfig {
@@ -140,7 +160,7 @@ fn test_flood() {
 
     let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, FreeSpace);
 
-    sim = sim.n_ticks(1000);
+    sim = sim.n_ticks(10);
 
     for node in sim.global_state_manager.nodes() {
         debug!(

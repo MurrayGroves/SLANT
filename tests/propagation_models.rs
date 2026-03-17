@@ -1,18 +1,25 @@
 mod common;
-use crate::common::behaviours::TestablePacket;
+
 use common::behaviours::{Monotonic, StaticMovement};
 use manetsim::packets::{MulticastPacket, Packet};
 use manetsim::propagation_models::{FreeSpace, FreeSpaceParams, PropagationParams};
 use manetsim::types::{NodeData, NodeID, NodeInit, SimConfig, SimManager};
+use std::sync::Arc;
 
 #[test]
 fn free_space() {
     env_logger::init();
 
+    let closure =
+        Arc::new(
+            |_: &NodeData<f32, 2, FreeSpaceParams<f32, 2>>, content| MulticastTestPacket {
+                content,
+            },
+        );
     let nodes = vec![
         NodeInit {
             starting_position: [0.0, 0.0],
-            node_behaviour: Monotonic::new(5),
+            node_behaviour: Monotonic::new(5, closure.clone()),
             move_behaviour: StaticMovement {},
             propagation_params: FreeSpaceParams::new(
                 8.0,
@@ -25,7 +32,7 @@ fn free_space() {
         },
         NodeInit {
             starting_position: [6_000.0, 0.0], // 6km
-            node_behaviour: Monotonic::new(5),
+            node_behaviour: Monotonic::new(5, closure.clone()),
             move_behaviour: StaticMovement {},
             propagation_params: FreeSpaceParams::new(
                 8.0,
@@ -38,7 +45,7 @@ fn free_space() {
         },
         NodeInit {
             starting_position: [12_000.0, 0.0], // 12km
-            node_behaviour: Monotonic::new(5),
+            node_behaviour: Monotonic::new(5, closure.clone()),
             move_behaviour: StaticMovement {},
             propagation_params: FreeSpaceParams::new(
                 8.0,
@@ -77,16 +84,10 @@ fn free_space() {
         }
     }
 
-    impl TestablePacket<f32, 2> for MulticastTestPacket {
-        fn new(content: Box<[u8]>) -> Self {
-            Self { content }
-        }
-    }
-
     struct TestSimConfig;
     impl SimConfig<f32, 2> for TestSimConfig {
         type MB = StaticMovement;
-        type NB = Monotonic<MulticastTestPacket>;
+        type NB = Monotonic<f32, 2, MulticastTestPacket, FreeSpaceParams<f32, 2>>;
         type PM = FreeSpace;
         type S = ();
     }

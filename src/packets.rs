@@ -1,10 +1,9 @@
 use crate::propagation_models::PropagationParams;
 use crate::types::{Coord, NodeData, NodeID};
-use dyn_clone::DynClone;
 use num_traits::Num;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
-use std::ops::Deref;
+use std::ops::{AddAssign, Deref};
 
 #[derive(Clone)]
 pub struct UnicastPacket {
@@ -65,7 +64,7 @@ impl Debug for MulticastPacket {
     }
 }
 
-pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync + DynClone {
+pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync + Clone {
     fn content(self) -> Box<[u8]>;
 
     fn content_ref(&self) -> &Box<[u8]>;
@@ -81,9 +80,56 @@ pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync + DynClone {
         Self: Sized;
 }
 
-impl<A: Coord<K>, const K: usize> Clone for Box<dyn Packet<A, K>> {
-    fn clone(&self) -> Self {
-        dyn_clone::clone_box(&**self)
+#[derive(Clone, Debug)]
+pub enum MulticastOrUnicast {
+    MulticastPacket(MulticastPacket),
+    UnicastPacket(UnicastPacket),
+}
+
+impl<A: Coord<K>, const K: usize> Packet<A, K> for MulticastOrUnicast {
+    fn content(self) -> Box<[u8]> {
+        match self {
+            MulticastOrUnicast::UnicastPacket(pck) => <UnicastPacket as Packet<A, K>>::content(pck),
+            MulticastOrUnicast::MulticastPacket(pck) => {
+                <MulticastPacket as Packet<A, K>>::content(pck)
+            }
+        }
+    }
+
+    fn content_ref(&self) -> &Box<[u8]> {
+        match self {
+            MulticastOrUnicast::UnicastPacket(pck) => {
+                <UnicastPacket as Packet<A, K>>::content_ref(pck)
+            }
+            MulticastOrUnicast::MulticastPacket(pck) => {
+                <MulticastPacket as Packet<A, K>>::content_ref(pck)
+            }
+        }
+    }
+
+    fn eager_targets(&self) -> Option<Vec<NodeID>> {
+        match self {
+            MulticastOrUnicast::UnicastPacket(pck) => {
+                <UnicastPacket as Packet<A, K>>::eager_targets(pck)
+            }
+            MulticastOrUnicast::MulticastPacket(pck) => {
+                <MulticastPacket as Packet<A, K>>::eager_targets(pck)
+            }
+        }
+    }
+
+    fn targets<P: PropagationParams<A, K>>(&self, target: &NodeData<A, K, P>) -> bool
+    where
+        Self: Sized,
+    {
+        match self {
+            MulticastOrUnicast::UnicastPacket(pck) => {
+                <UnicastPacket as Packet<A, K>>::targets(pck, target)
+            }
+            MulticastOrUnicast::MulticastPacket(pck) => {
+                <MulticastPacket as Packet<A, K>>::targets(pck, target)
+            }
+        }
     }
 }
 
@@ -104,6 +150,6 @@ pub trait LocallySequencedPacket<A: Coord<K>, const K: usize>: OriginatedPacket<
 /// this as a concatenation of the originator and the local sequence number.
 pub trait GloballySequencedPacket<A: Coord<K>, const K: usize>: Packet<A, K> {
     /// Type for sequence number
-    type S: Num + Send + Sync + Clone + Eq + Hash;
+    type S: Num + Send + Sync + Copy + Eq + Hash + AddAssign;
     fn seq(&self) -> Self::S;
 }

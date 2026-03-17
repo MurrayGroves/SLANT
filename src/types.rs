@@ -1,13 +1,12 @@
 use crate::packets::Packet;
 use crate::propagation_models::{PropagationModel, PropagationParams, SimpleDistanceParams};
 use crate::stats::TimestepStats;
-use dyn_clone::DynClone;
 use kiddo::SquaredEuclidean;
 use kiddo::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use kiddo::traits::Content;
 use linearize::Linearize;
-use log::trace;
+use log::{debug, info, trace};
 use num_traits::Float;
 use num_traits::float::FloatCore;
 use rand::Rng;
@@ -26,21 +25,30 @@ where
     <Self::S as Linearize>::Storage<isize>: Send,
 {
     type MB: MoveBehaviour<A, K>;
-    type NB: NodeBehaviour<A, K>;
+    type NB: NodeBehaviour<A, K, <<Self as SimConfig<A, K>>::PM as PropagationModel<A, K>>::P>;
     type PM: PropagationModel<A, K>;
     /// Key type for stored stats
     type S: Linearize;
 }
 
 /// Describes a node behaviour which performs some processing each tick to produce a new node behaviour
-pub trait NodeBehaviour<A: Coord<K>, const K: usize>: Sized + Send + Sync + Clone {
+pub trait NodeBehaviour<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>>:
+    Sized + Send + Sync + Clone
+{
     /// Packet type that this node can receive and process.
     type P: Packet<A, K> + ?Sized;
-    fn tick<C: SimConfig<A, K, NB = impl NodeBehaviour<A, K, P = Self::P>>>(
+    fn tick<
+        C: SimConfig<
+                A,
+                K,
+                PM = impl PropagationModel<A, K, P = PP>,
+                NB = impl NodeBehaviour<A, K, PP, P = Self::P>,
+            >,
+    >(
         self,
         node_data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
         global_state_manager: &GlobalStateManager<A, K, C>,
-        incoming_packets: &Vec<Box<Self::P>>,
+        incoming_packets: &Vec<Self::P>,
     ) -> Self;
 }
 
@@ -56,7 +64,7 @@ pub type NodeID = usize;
 
 #[derive(Clone)]
 pub struct Node<
-    NB: NodeBehaviour<A, K> + Sized,
+    NB: NodeBehaviour<A, K, P> + Sized,
     MB: MoveBehaviour<A, K> + Sized,
     P: PropagationParams<A, K> + Sized,
     A: Coord<K> + Sized,
@@ -98,7 +106,7 @@ where
 }
 
 impl<
-    NB: NodeBehaviour<A, K>,
+    NB: NodeBehaviour<A, K, P>,
     MB: MoveBehaviour<A, K>,
     A: Coord<K>,
     const K: usize,
@@ -116,7 +124,7 @@ impl<
     fn tick_behaviour<PM, C: SimConfig<A, K, PM = PM, NB = NB>>(
         self,
         global_state_manager: &GlobalStateManager<A, K, C>,
-        incoming_packets: &Vec<Box<NB::P>>,
+        incoming_packets: &Vec<NB::P>,
     ) -> Self
     where
         PM: PropagationModel<A, K, P = P>,
@@ -158,9 +166,19 @@ pub struct GlobalStateManager<A: Coord<K>, const K: usize, C: SimConfig<A, K>> {
     /// KD Tree storing all nodes by position, allows for efficient spatial lookup
     tree: Arc<ImmutableKdTree<A, u32, K, 32>>,
     /// Packets that have been sent to each node in the previous tick.
-    incoming_packets: Arc<HashMap<NodeID, Vec<Box<<C::NB as NodeBehaviour<A, K>>::P>>>>,
+    incoming_packets: Arc<
+        HashMap<
+            NodeID,
+            Vec<<C::NB as NodeBehaviour<A, K, <C::PM as PropagationModel<A, K>>::P>>::P>,
+        >,
+    >,
     /// Packets that have been sent to each node during this tick.
-    new_packets: Arc<HashMap<NodeID, Mutex<Vec<Box<<C::NB as NodeBehaviour<A, K>>::P>>>>>,
+    new_packets: Arc<
+        HashMap<
+            NodeID,
+            Mutex<Vec<<C::NB as NodeBehaviour<A, K, <C::PM as PropagationModel<A, K>>::P>>::P>>,
+        >,
+    >,
     rngs: Arc<Vec<SyncUnsafeCell<Xoshiro256Plus>>>,
     propagation_model: C::PM,
     /// Thread-local stats
@@ -256,7 +274,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
     pub fn transmit_packet(
         &self,
         transmitter: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
-        packet: Box<<C::NB as NodeBehaviour<A, K>>::P>,
+        packet: <C::NB as NodeBehaviour<A, K, <C::PM as PropagationModel<A, K>>::P>>::P,
     ) {
         let eager_targets = packet.eager_targets();
         let recipients: Vec<&NodeID> = match &eager_targets {
@@ -299,7 +317,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
         for recipient in recipients {
             let mutex = unsafe { self.new_packets.get(recipient).unwrap_unchecked() };
             let mut packets = mutex.lock().unwrap();
-            packets.push(dyn_clone::clone_box(&packet));
+            packets.push(packet.clone());
         }
     }
 
@@ -330,14 +348,17 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
         let nodes = nodes
             .into_iter()
             .enumerate()
-            .map(|(index, node)| Node {
-                behaviour: node.node_behaviour,
-                move_behaviour: node.move_behaviour,
-                data: NodeData {
+            .map(|(index, node)| {
+                let data = NodeData {
                     id: index,
                     position: node.starting_position,
                     propagation_params: node.propagation_params,
-                },
+                };
+                Node {
+                    behaviour: node.node_behaviour,
+                    move_behaviour: node.move_behaviour,
+                    data,
+                }
             })
             .collect();
 
@@ -348,7 +369,8 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
 
     /// Perform `n` ticks of the simulation, returning the new global state at the end
     pub fn n_ticks(mut self, num_ticks: usize) -> Self {
-        for _ in 0..num_ticks {
+        for i in 0..num_ticks {
+            info!("Doing tick {}", i);
             self.global_state_manager = self.global_state_manager.tick();
         }
         self
@@ -358,7 +380,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
 /// Constructed by end-user and passed into construction of sim
 #[derive(Clone)]
 pub struct NodeInit<
-    NB: NodeBehaviour<A, K>,
+    NB: NodeBehaviour<A, K, P>,
     MB: MoveBehaviour<A, K>,
     P: PropagationParams<A, K>,
     A: Coord<K>,
