@@ -86,9 +86,18 @@ impl<A: Coord<K>, const K: usize> PropagationModel<A, K> for FreeSpace {
             + (tp.transmit_gain)(transmitter, direction)
             + (rp.receive_gain)(receiver, direction);
 
-        let received = receive_power > rp.mds;
+        let received = receive_power >= rp.mds;
+        trace!(
+            "Transmit from {:?} to {:?} had receive power of {:?} / {:?}, at a distance of {:?}/{:?} (prune dist) was {}",
+            transmitter.id,
+            receiver.id,
+            receive_power,
+            rp.mds,
+            dist,
+            rp.prune_distance(),
+            received
+        );
 
-        trace!("Transmit from {:?} to {:?} was {}", tp, rp, received);
         received
     }
     type P = FreeSpaceParams<A, K>;
@@ -118,10 +127,11 @@ impl<A: Coord<K>, const K: usize> FreeSpaceParams<A, K> {
     ) -> Self {
         let max_theoretical_range = (wave_length
             / A::from(10.0).unwrap().powf(
-                (A::from(-130).unwrap()
+                //
+                (A::from(-120).unwrap() // MDS
                     - max_transmit_gain
                     - transmit_power
-                    - A::from(30.0).unwrap())
+                    - A::from(30.0).unwrap()) // Receiver gain
                     / A::from(20.0).unwrap(),
             ))
             / A::from(4.0 * PI).unwrap();

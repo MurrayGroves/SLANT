@@ -14,3 +14,4 @@ env_logger = "*"
 rayon = "1.11.0"
 linearize = { version = "*", features = ["derive"] }
 thread_local = "*"
+az = "1.3.0"

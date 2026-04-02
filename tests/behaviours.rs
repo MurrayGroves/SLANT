@@ -1,5 +1,5 @@
 use crate::common::behaviours::{Monotonic, StaticMovement};
-use log::{debug, trace};
+use log::{debug, info, trace};
 use manetsim::example_behaviours::flood::Flood;
 use manetsim::example_behaviours::flood::FloodPacket;
 use manetsim::packets::{GloballySequencedPacket, Packet};
@@ -9,8 +9,10 @@ use manetsim::propagation_models::{
 use manetsim::types::{
     Coord, GlobalStateManager, NodeBehaviour, NodeData, NodeID, NodeInit, SimConfig, SimManager,
 };
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::BitAnd;
 use std::sync::Arc;
+use std::thread::sleep;
 
 mod common;
 
@@ -47,7 +49,12 @@ impl<A: Coord<K>, const K: usize> GloballySequencedPacket<A, K> for TestPacket {
     type S = u16;
 
     fn seq(&self) -> Self::S {
-        self.seq.bitand(self.src as Self::S)
+        let mut s = DefaultHasher::new();
+        self.seq.hash(&mut s);
+        self.src.hash(&mut s);
+        let hash = az::overflowing_cast(s.finish()).0;
+        trace!("{:?}, {:?} hashed to {:?}", self.seq, self.src, hash);
+        hash
     }
 }
 
@@ -125,10 +132,10 @@ fn generate_nodes(
     num_nodes: usize,
     gap: f32,
 ) -> Vec<NodeInit<MonotonicFlood, StaticMovement, FreeSpaceParams<f32, 2>, f32, 2>> {
-    let dim = num_nodes.isqrt() + 1;
+    let dim = num_nodes.isqrt();
     let mut nodes = Vec::with_capacity(num_nodes);
     for i in 0..num_nodes {
-        let xy = [(i as f32 / dim as f32) * gap, (i % dim) as f32 * gap];
+        let xy = [(i / dim) as f32 * gap, (i % dim) as f32 * gap];
         trace!("Spawning at {:?}", xy);
         nodes.push(NodeInit {
             starting_position: xy,
@@ -138,7 +145,7 @@ fn generate_nodes(
                 8.0,
                 0.34538301613, // 868mhz in metres
                 |_, _| 11.0,   // Omnidirectional
-                0.0,
+                11.0,
                 |_, _| 0.0, // Omnidirectional
                 -90.0,
             ),
@@ -151,7 +158,8 @@ fn generate_nodes(
 fn test_flood() {
     env_logger::init();
 
-    let nodes = generate_nodes(10_000, 3_000.0);
+    let nodes = generate_nodes(1024, 3_000.0);
+    sleep(std::time::Duration::from_secs(1));
 
     struct TestConfig;
     impl SimConfig<f32, 2> for TestConfig {
@@ -165,11 +173,20 @@ fn test_flood() {
 
     sim = sim.n_ticks(10);
 
+    let mut received_packets = 0;
+    let mut originated_packets = 0;
     for node in sim.global_state_manager.nodes() {
         debug!(
-            "{}: {}",
+            "{} ({}, {}): {}",
             node.data().id,
+            node.data().position[0],
+            node.data().position[1],
             node.node_behaviour().monotonic.received_packets
         );
+        received_packets += node.node_behaviour().monotonic.received_packets;
+        originated_packets += node.node_behaviour().flood.seq();
     }
+
+    info!("Received {} packets total", received_packets);
+    info!("Originated {} packets total", originated_packets);
 }

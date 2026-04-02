@@ -92,11 +92,17 @@ impl<PT: FloodPacket<A, K> + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K>
         let mut seq = self.seq.lock().unwrap();
         let packet = PT::new(
             data,
-            <<PT as FloodPacket<A, K>>::H as NumCast>::from(5).unwrap(),
+            <<PT as FloodPacket<A, K>>::H as NumCast>::from(0).unwrap(),
             *seq,
             content,
         );
         *seq += PT::S::one();
         packet
+    }
+}
+
+impl<PT: FloodPacket<A, K> + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
+    pub fn seq(&self) -> PT::S {
+        *self.seq.lock().unwrap()
     }
 }
