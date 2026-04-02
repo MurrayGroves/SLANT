@@ -150,6 +150,6 @@ pub trait LocallySequencedPacket<A: Coord<K>, const K: usize>: OriginatedPacket<
 /// this as a concatenation of the originator and the local sequence number.
 pub trait GloballySequencedPacket<A: Coord<K>, const K: usize>: Packet<A, K> {
     /// Type for sequence number
-    type S: Num + Send + Sync + Copy + Eq + Hash + AddAssign;
+    type S: Num + Send + Sync + Copy + Eq + Hash + AddAssign + Debug;
     fn seq(&self) -> Self::S;
 }

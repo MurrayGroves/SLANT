@@ -1,8 +1,10 @@
 use crate::packets::{GloballySequencedPacket, Packet};
 use crate::propagation_models::{PropagationModel, PropagationParams};
 use crate::types::{Coord, GlobalStateManager, NodeBehaviour, NodeData, SimConfig};
+use log::trace;
 use num_traits::{Num, NumCast, One, Zero};
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::AddAssign;
 use std::sync::{Arc, Mutex};
@@ -36,7 +38,7 @@ impl<
     A,
     const K: usize,
     PT,
-    H: Num + NumCast + PartialOrd + Zero + Send + Sync + Clone,
+    H: Num + NumCast + PartialOrd + Zero + Send + Sync + Clone + Debug,
     PP: PropagationParams<A, K>,
 > NodeBehaviour<A, K, PP> for Flood<PT, A, K>
 where
@@ -67,7 +69,15 @@ where
                 let mut packet = packet.clone();
                 packet.set_hop_count(packet.get_hop_count() - <PT as FloodPacket<A, K>>::H::one());
                 seen_packets.insert(packet.seq());
+                trace!(
+                    "{:?}: transmitting packet {:?} with {:?} hops left",
+                    node_data.id,
+                    packet.seq(),
+                    packet.get_hop_count()
+                );
                 global_state_manager.transmit_packet(node_data, packet);
+            } else {
+                trace!("{:?} has already seen {:?}", node_data.id, packet.seq());
             }
         }
         drop(seen_packets);
@@ -92,7 +102,7 @@ impl<PT: FloodPacket<A, K> + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K>
         let mut seq = self.seq.lock().unwrap();
         let packet = PT::new(
             data,
-            <<PT as FloodPacket<A, K>>::H as NumCast>::from(0).unwrap(),
+            <<PT as FloodPacket<A, K>>::H as NumCast>::from(5).unwrap(),
             *seq,
             content,
         );
