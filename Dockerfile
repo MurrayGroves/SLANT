@@ -1,0 +1,16 @@
+FROM rust
+
+RUN mkdir -p /home/ij22909
+WORKDIR /home/ij22909
+ADD src src
+ADD tests tests
+ADD Cargo.toml Cargo.toml
+ADD Cargo.lock Cargo.lock
+ADD rust-toolchain.toml rust-toolchain.toml
+
+RUN cargo fetch
+
+ENV CARGO_TARGET_DIR=/user/home/ij22909/internal
+ENV RUST_LOG=info
+
+CMD ["cargo", "test", "--target", "host-tuple", "--release", "flood", "--", "--no-capture"]
