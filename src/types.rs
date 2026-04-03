@@ -1,5 +1,7 @@
 use crate::packets::Packet;
 use crate::propagation_models::{PropagationModel, PropagationParams, SimpleDistanceParams};
+use crate::stats::InternalEvent::{PacketLink, PacketTransmit};
+use crate::stats::InternalStatKey::PacketTransmits;
 use crate::stats::TimestepStats;
 use kiddo::SquaredEuclidean;
 use kiddo::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
@@ -14,7 +16,7 @@ use rand::distr::uniform::SampleUniform;
 use rand_xoshiro::Xoshiro256Plus;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 use rayon::prelude::*;
-use std::cell::SyncUnsafeCell;
+use std::cell::{Cell, RefCell, SyncUnsafeCell};
 use std::collections::HashMap;
 use std::iter::Sum;
 use std::sync::{Arc, Mutex};
@@ -182,7 +184,7 @@ pub struct GlobalStateManager<A: Coord<K>, const K: usize, C: SimConfig<A, K>> {
     rngs: Arc<Vec<SyncUnsafeCell<Xoshiro256Plus>>>,
     propagation_model: C::PM,
     /// Thread-local stats
-    stats: Arc<ThreadLocal<TimestepStats<C::S>>>,
+    stats: Arc<ThreadLocal<RefCell<TimestepStats<C::S>>>>,
 }
 
 impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C> {
@@ -222,7 +224,9 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
 }
 
 impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C> {
-    fn tick(self) -> Self {
+    /// Returns new state
+    fn tick(mut self) -> Self {
+        self.stats = Arc::new(ThreadLocal::new());
         let nodes: Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> = (*self
             .nodes)
             .clone()
@@ -267,7 +271,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
             rngs: self.rngs,
             nodes: Arc::new(nodes),
             propagation_model: self.propagation_model,
-            stats: Arc::new(ThreadLocal::new()),
+            stats: self.stats,
         }
     }
 
@@ -276,6 +280,10 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
         transmitter: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
         packet: <C::NB as NodeBehaviour<A, K, <C::PM as PropagationModel<A, K>>::P>>::P,
     ) {
+        let mut stats = self.stats.get_or_default().borrow_mut();
+        stats.add_event(PacketTransmit(transmitter.id));
+        stats.inc_internal(PacketTransmits, 1);
+
         let eager_targets = packet.eager_targets();
         let recipients: Vec<&NodeID> = match &eager_targets {
             Some(targets) => targets
@@ -315,6 +323,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
             transmitter.propagation_params.prune_distance()
         );
         for recipient in recipients {
+            stats.add_event(PacketLink((transmitter.id, *recipient)));
             let mutex = unsafe { self.new_packets.get(recipient).unwrap_unchecked() };
             let mut packets = mutex.lock().unwrap();
             packets.push(packet.clone());

@@ -1,7 +1,17 @@
+use crate::types::NodeID;
 use linearize::{Linearize, StaticMap};
 
 #[derive(Linearize)]
-enum InternalStatKey {}
+pub(crate) enum InternalStatKey {
+    PacketTransmits,
+}
+
+pub(crate) enum InternalEvent {
+    /// A node transmitted a packet
+    PacketTransmit(NodeID),
+    /// A src sent a packet to a dst
+    PacketLink((NodeID, NodeID)),
+}
 
 enum StatKey<T: Linearize> {
     Internal(InternalStatKey),
@@ -12,6 +22,7 @@ enum StatKey<T: Linearize> {
 /// Note you cannot retrieve stats during a tick, as stats are thread-localised
 pub struct TimestepStats<T: Linearize> {
     internal: StaticMap<InternalStatKey, isize>,
+    internal_events: Vec<InternalEvent>,
     user: StaticMap<T, isize>,
 }
 
@@ -20,6 +31,7 @@ impl<T: Linearize> TimestepStats<T> {
         Self {
             internal: StaticMap::default(),
             user: StaticMap::default(),
+            internal_events: Vec::new(),
         }
     }
 
@@ -31,11 +43,21 @@ impl<T: Linearize> TimestepStats<T> {
         self.user[key] -= by;
     }
 
-    pub(crate) fn inc_internal(&mut self, key: T, by: isize) {
-        self.user[key] += by;
+    pub(crate) fn inc_internal(&mut self, key: InternalStatKey, by: isize) {
+        self.internal[key] += by;
     }
 
-    pub(crate) fn dec_internal(&mut self, key: T, by: isize) {
-        self.user[key] -= by;
+    pub(crate) fn dec_internal(&mut self, key: InternalStatKey, by: isize) {
+        self.internal[key] -= by;
+    }
+
+    pub(crate) fn add_event(&mut self, event: InternalEvent) {
+        self.internal_events.push(event);
+    }
+}
+
+impl<T: Linearize> Default for TimestepStats<T> {
+    fn default() -> Self {
+        TimestepStats::new()
     }
 }
