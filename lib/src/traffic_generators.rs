@@ -1,6 +1,7 @@
 use crate::packets::{MulticastOrUnicast, MulticastPacket, Packet, UnicastPacket};
 use crate::propagation_models::{PropagationModel, PropagationParams};
 use crate::types::{Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeID, SimConfig};
+use rand::RngExt;
 
 pub fn mixed_multicast_and_random_target_unicast<
     A: Coord<K>,

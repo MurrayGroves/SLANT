@@ -11,7 +11,7 @@ use linearize::Linearize;
 use log::{debug, info, trace};
 use num_traits::Float;
 use num_traits::float::FloatCore;
-use rand::Rng;
+use rand::RngExt;
 use rand::distr::uniform::SampleUniform;
 use rand_xoshiro::Xoshiro256Plus;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};

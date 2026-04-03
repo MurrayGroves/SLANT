@@ -1,0 +1,10 @@
+[package]
+name = "manetsim-gui"
+edition = "2024"
+
+[dependencies]
+libcosmic = { git = "https://github.com/pop-os/libcosmic.git" }
+
+[[bin]]
+name = "manetsim-gui"
+path = "src/main.rs"
