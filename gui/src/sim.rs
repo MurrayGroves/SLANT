@@ -1,23 +1,19 @@
-use crate::common::behaviours::{Monotonic, StaticMovement};
-use log::{debug, info, trace};
-use manetsim::example_behaviours::flood::Flood;
-use manetsim::example_behaviours::flood::FloodPacket;
+use log::trace;
+use manetsim::example_behaviours::RandomWalk;
+use manetsim::example_behaviours::flood::{Flood, FloodPacket};
 use manetsim::packets::{GloballySequencedPacket, Packet};
 use manetsim::propagation_models::{
     FreeSpace, FreeSpaceParams, PropagationModel, PropagationParams,
 };
 use manetsim::types::{
-    Coord, GlobalStateManager, NodeBehaviour, NodeData, NodeID, NodeInit, SimConfig, SimManager,
+    Coord, GlobalStateManager, NodeBehaviour, NodeData, NodeID, NodeInit, SimConfig,
 };
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::ops::BitAnd;
+use std::marker::PhantomData;
 use std::sync::Arc;
-use std::thread::sleep;
-
-mod common;
 
 #[derive(Clone, Debug)]
-struct TestPacket {
+pub struct TestPacket {
     hops: u8,
     seq: u16,
     src: NodeID,
@@ -85,7 +81,77 @@ impl<A: Coord<K>, const K: usize> FloodPacket<A, K> for TestPacket {
 }
 
 #[derive(Clone)]
-struct MonotonicFlood {
+pub struct Monotonic<
+    A: Coord<K>,
+    const K: usize,
+    P: Packet<A, K> + Clone,
+    PP: PropagationParams<A, K>,
+> {
+    packet_type: PhantomData<P>,
+    pub ticks_per_packet: usize,
+    counter: usize,
+    pub received_packets: usize,
+    gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
+}
+
+impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet<A, K> + Clone>
+    Monotonic<A, K, P, PP>
+{
+    pub fn new(
+        ticks_per_packet: usize,
+        gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
+    ) -> Self {
+        Monotonic {
+            packet_type: Default::default(),
+            ticks_per_packet,
+            counter: 0,
+            received_packets: 0,
+            gen_packet,
+        }
+    }
+}
+
+impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet<A, K> + Clone>
+    NodeBehaviour<A, K, PP> for Monotonic<A, K, P, PP>
+{
+    type P = P;
+
+    fn tick<
+        C: SimConfig<
+                A,
+                K,
+                PM = impl PropagationModel<A, K, P = PP>,
+                NB = impl NodeBehaviour<A, K, PP, P = Self::P>,
+            >,
+    >(
+        mut self,
+        node_data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
+        global_state_manager: &GlobalStateManager<A, K, C>,
+        incoming_packets: &Vec<Self::P>,
+    ) -> Self {
+        trace!("Ticking {}", node_data.id);
+        self.received_packets += incoming_packets.len();
+        trace!(
+            "{} received {:?}",
+            node_data.id,
+            incoming_packets.iter().map(|x| x.content_ref()[0])
+        );
+
+        if self.counter % self.ticks_per_packet == 0 {
+            global_state_manager.transmit_packet(
+                node_data,
+                (self.gen_packet)(node_data, Box::new(node_data.id.to_be_bytes())),
+            )
+        }
+
+        self.counter += 1;
+
+        self
+    }
+}
+
+#[derive(Clone)]
+pub struct MonotonicFlood {
     monotonic: Monotonic<f32, 2, TestPacket, FreeSpaceParams<f32, 2>>,
     flood: Flood<TestPacket, f32, 2>,
 }
@@ -128,10 +194,10 @@ impl MonotonicFlood {
     }
 }
 
-fn generate_nodes(
+pub fn generate_nodes(
     num_nodes: usize,
     gap: f32,
-) -> Vec<NodeInit<MonotonicFlood, StaticMovement, FreeSpaceParams<f32, 2>, f32, 2>> {
+) -> Vec<NodeInit<MonotonicFlood, RandomWalk<30, f32, 2>, FreeSpaceParams<f32, 2>, f32, 2>> {
     let dim = num_nodes.isqrt();
     let mut nodes = Vec::with_capacity(num_nodes);
     for i in 0..num_nodes {
@@ -140,7 +206,7 @@ fn generate_nodes(
         nodes.push(NodeInit {
             starting_position: xy,
             node_behaviour: MonotonicFlood::new(),
-            move_behaviour: StaticMovement {},
+            move_behaviour: RandomWalk::new([0.0, 1.0]),
             propagation_params: FreeSpaceParams::new(
                 8.0,
                 0.34538301613, // 868mhz in metres
@@ -153,39 +219,10 @@ fn generate_nodes(
     }
     nodes
 }
-
-#[test]
-fn test_flood() {
-    env_logger::init();
-
-    let nodes = generate_nodes(1024, 3_000.0);
-
-    struct TestConfig;
-    impl SimConfig<f32, 2> for TestConfig {
-        type MB = StaticMovement;
-        type NB = MonotonicFlood;
-        type PM = FreeSpace;
-        type S = ();
-    }
-
-    let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, FreeSpace);
-
-    sim = sim.n_ticks(10);
-
-    let mut received_packets = 0;
-    let mut originated_packets = 0;
-    for node in sim.global_state_manager.nodes() {
-        debug!(
-            "{} ({}, {}): {}",
-            node.data().id,
-            node.data().position[0],
-            node.data().position[1],
-            node.node_behaviour().monotonic.received_packets
-        );
-        received_packets += node.node_behaviour().monotonic.received_packets;
-        originated_packets += node.node_behaviour().flood.seq();
-    }
-
-    info!("Received {} packets total", received_packets);
-    info!("Originated {} packets total", originated_packets);
+pub struct SimConf;
+impl SimConfig<f32, 2> for SimConf {
+    type MB = RandomWalk<30, f32, 2>;
+    type NB = MonotonicFlood;
+    type PM = FreeSpace;
+    type S = ();
 }

@@ -96,7 +96,7 @@ impl Coord<2> for f32 {}
 
 impl Coord<2> for f64 {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NodeData<A: Coord<K>, const K: usize, P: PropagationParams<A, K> + Sized>
 where
     Self: Sized,

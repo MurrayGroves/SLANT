@@ -2,11 +2,12 @@ use crate::types::NodeID;
 use linearize::{Linearize, StaticMap};
 
 #[derive(Linearize)]
-pub(crate) enum InternalStatKey {
+pub enum InternalStatKey {
     PacketTransmits,
 }
 
-pub(crate) enum InternalEvent {
+#[derive(Clone, Debug)]
+pub enum InternalEvent {
     /// A node transmitted a packet
     PacketTransmit(NodeID),
     /// A src sent a packet to a dst

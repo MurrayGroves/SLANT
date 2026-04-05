@@ -4,6 +4,10 @@ edition = "2024"
 
 [dependencies]
 libcosmic = { git = "https://github.com/pop-os/libcosmic.git" }
+manetsim = { path = "../lib" }
+az = "1.3.0"
+log = "0.4.29"
+num-traits = "0.2.19"
 
 [[bin]]
 name = "manetsim-gui"
