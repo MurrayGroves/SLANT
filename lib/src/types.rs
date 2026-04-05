@@ -243,6 +243,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
 impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C> {
     /// Returns new state
     fn tick(mut self) -> Self {
+        debug!("Ticking with {:?} threads", rayon::current_num_threads());
         self.stats = Arc::new(ThreadLocal::new());
         let nodes: Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> = (*self
             .nodes)

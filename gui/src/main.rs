@@ -15,14 +15,16 @@ use manetsim::example_behaviours::flood::Flood;
 use manetsim::propagation_models::{FreeSpace, FreeSpaceParams};
 use manetsim::stats::InternalEvent;
 use manetsim::types::{NodeData, SimConfig, SimManager};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
 use tokio::task::spawn_blocking;
+use tokio::time::Instant;
 
 struct App {
     core: cosmic::Core,
     sim: Arc<RwLock<manetsim::types::SimManager<f32, 2, SimConf>>>,
     sim_canvas: SimCanvas,
+    status_text: String,
 }
 
 #[derive(Debug, Clone)]
@@ -66,8 +68,10 @@ impl cosmic::Application for App {
                     .map(|x| x.data().clone())
                     .collect(),
                 events: Vec::new(),
+                reset: Arc::new(Mutex::new(false)),
             },
             sim: Arc::new(RwLock::new(sim)),
+            status_text: "".to_string(),
         };
 
         let command = app.set_window_title("Manetsim".to_string(), iced::window::Id::unique());
@@ -79,7 +83,9 @@ impl cosmic::Application for App {
             .width(iced::Length::Fill)
             .height(iced::Length::Fill);
         let button = widget::button::text("Tick").on_press(Message::Tick);
-        widget::column::with_children(vec![canvas.into(), button.into()]).into()
+        let status =
+            widget::row::with_children(vec![button.into(), widget::text(&self.status_text).into()]);
+        widget::column::with_children(vec![canvas.into(), status.into()]).into()
     }
 
     fn update(&mut self, message: Self::Message) -> cosmic::app::Task<Self::Message> {
@@ -87,17 +93,23 @@ impl cosmic::Application for App {
             Message::SimData(x) => {
                 self.sim_canvas.events = x.events;
                 self.sim_canvas.nodes = x.nodes;
+                let mut reset = self.sim_canvas.reset.lock().unwrap();
+                *reset = true;
+
                 debug!("Updated sim data");
-                println!("updated sim data");
+                self.status_text = "".to_string();
                 cosmic::task::none()
             }
             Message::Tick => {
                 // Spawn task to tick sim
                 let sim = Arc::clone(&self.sim);
+                self.status_text = "running tick".to_string();
                 cosmic::task::future(async move {
                     let result = tokio::task::spawn_blocking(async move || {
                         let mut sim = sim.write().await;
+                        let start = Instant::now();
                         sim.n_ticks(1);
+                        debug!("Tick finished after {:?}", start.elapsed());
                         SimData {
                             nodes: sim
                                 .global_state_manager
