@@ -222,6 +222,22 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
     pub fn nodes(&self) -> &Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> {
         &self.nodes
     }
+
+    /// Calling this will clear the internal stats buffer!
+    pub fn consume_stats(&mut self) -> TimestepStats<C::S> {
+        let mut stats = TimestepStats::new();
+        for thread in Arc::into_inner(std::mem::take(&mut self.stats))
+            .unwrap()
+            .into_iter()
+        {
+            stats.consume(&*thread.borrow())
+        }
+        debug!(
+            "Consumed stats buffer has {} events",
+            stats.internal_events.len()
+        );
+        stats
+    }
 }
 
 impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C> {

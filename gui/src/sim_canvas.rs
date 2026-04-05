@@ -1,13 +1,22 @@
 use crate::Message;
+use cosmic::iced;
 use cosmic::iced::mouse::Cursor;
+use cosmic::iced::theme::Style;
 use cosmic::iced::{Color, Point, Rectangle, Renderer, Theme};
 use cosmic::iced_widget::canvas::Geometry;
 use cosmic::widget::canvas;
-use cosmic::widget::canvas::Program;
+use cosmic::widget::canvas::{Program, Stroke};
+use log::debug;
 use manetsim::propagation_models::FreeSpaceParams;
 use manetsim::stats::InternalEvent;
 use manetsim::types::NodeData;
 use num_traits::float::Float;
+
+#[derive(Debug, Clone)]
+struct Node {
+    position: Point,
+    circle: canvas::Path,
+}
 
 #[derive(Debug, Clone)]
 pub struct SimCanvas {
@@ -48,20 +57,41 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
             }
         }
 
+        let mut node_vis = Vec::new();
+
         let x_ratio: f32 = (bounds.size().width * 0.9 / (max_x - min_x));
         let y_ratio: f32 = (bounds.size().height * 0.9 / (max_y - min_y));
         let background = canvas::Path::rectangle(Point::new(0.0, 0.0), bounds.size());
         frame.fill(&background, Color::WHITE);
+
         for node in &self.nodes {
-            let circle = canvas::Path::circle(
-                Point::new(
-                    (node.position[0] - min_x) * x_ratio + (0.05 * bounds.size().width),
-                    (node.position[1] - min_y) * y_ratio + (0.05 * bounds.size().height),
-                ),
-                1.0,
+            let position = Point::new(
+                (node.position[0] - min_x) * x_ratio + (0.05 * bounds.size().width),
+                (node.position[1] - min_y) * y_ratio + (0.05 * bounds.size().height),
             );
-            frame.fill(&circle, Color::BLACK)
+            let circle = canvas::Path::circle(position, 1.0);
+            frame.fill(&circle, Color::BLACK);
+            node_vis.push(Node { circle, position })
         }
+
+        for event in &self.events {
+            match event {
+                InternalEvent::PacketTransmit(e) => {
+                    let node = node_vis.get(*e).unwrap();
+                    frame.fill(&node.circle, Color::from_rgb(0.0, 1.0, 0.0));
+                }
+                InternalEvent::PacketLink(e) => {
+                    let src = node_vis.get(e.0).unwrap().position;
+                    let dst = node_vis.get(e.1).unwrap().position;
+                    let packet_path = canvas::Path::line(src, dst);
+                    frame.stroke(
+                        &packet_path,
+                        Stroke::default().with_color(Color::from_rgb(0.0, 1.0, 0.0)),
+                    );
+                }
+            }
+        }
+
         vec![frame.into_geometry()]
     }
 }

@@ -105,7 +105,7 @@ impl cosmic::Application for App {
                                 .iter()
                                 .map(|x| x.data().clone())
                                 .collect(),
-                            events: vec![],
+                            events: sim.global_state_manager.consume_stats().events(),
                         }
                     })
                     .await

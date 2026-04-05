@@ -23,7 +23,7 @@ enum StatKey<T: Linearize> {
 /// Note you cannot retrieve stats during a tick, as stats are thread-localised
 pub struct TimestepStats<T: Linearize> {
     internal: StaticMap<InternalStatKey, isize>,
-    internal_events: Vec<InternalEvent>,
+    pub(crate) internal_events: Vec<InternalEvent>,
     user: StaticMap<T, isize>,
 }
 
@@ -54,6 +54,23 @@ impl<T: Linearize> TimestepStats<T> {
 
     pub(crate) fn add_event(&mut self, event: InternalEvent) {
         self.internal_events.push(event);
+    }
+
+    pub(crate) fn consume(&mut self, other: &Self) {
+        for (key, val) in &other.internal {
+            self.internal[key] += val;
+        }
+
+        for (key, val) in &other.user {
+            self.user[key] += val;
+        }
+
+        self.internal_events
+            .extend(other.internal_events.iter().cloned());
+    }
+
+    pub fn events(self) -> Vec<InternalEvent> {
+        self.internal_events
     }
 }
 
