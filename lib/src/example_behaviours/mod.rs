@@ -11,13 +11,15 @@ use num_traits::Float;
 pub struct RandomWalk<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> {
     tick_counter: u8,
     direction: [A; K],
+    velocity: A,
 }
 
 impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> RandomWalk<CHANGE_DELAY, A, K> {
-    pub fn new(starting_direction: [A; K]) -> Self {
+    pub fn new(velocity: A) -> Self {
         Self {
             tick_counter: 0,
-            direction: starting_direction,
+            direction: [A::zero(); K],
+            velocity,
         }
     }
 }
@@ -50,7 +52,7 @@ impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> MoveBehaviour<A, K>
                 .powf(A::from(0.5).unwrap());
 
             for i in 0..K {
-                direction[i] = direction[i] / magnitude
+                direction[i] = direction[i] / (magnitude / self.velocity)
             }
         }
 
@@ -62,6 +64,7 @@ impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> MoveBehaviour<A, K>
             Self {
                 tick_counter: self.tick_counter + 1,
                 direction,
+                velocity: self.velocity,
             },
             position,
         )

@@ -89,6 +89,7 @@ pub trait Coord<const K: usize>:
     + SampleUniform
     + Sized
     + Clone
+    + PartialEq
 {
 }
 
@@ -377,12 +378,11 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
     }
 
     /// Perform `n` ticks of the simulation, returning the new global state at the end
-    pub fn n_ticks(mut self, num_ticks: usize) -> Self {
+    pub fn n_ticks(&mut self, num_ticks: usize) {
         for i in 0..num_ticks {
             info!("Doing tick {}", i);
-            self.global_state_manager = self.global_state_manager.tick();
+            take_mut::take(&mut self.global_state_manager, |state| state.tick());
         }
-        self
     }
 }
 

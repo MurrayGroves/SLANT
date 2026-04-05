@@ -206,7 +206,7 @@ pub fn generate_nodes(
         nodes.push(NodeInit {
             starting_position: xy,
             node_behaviour: MonotonicFlood::new(),
-            move_behaviour: RandomWalk::new([0.0, 1.0]),
+            move_behaviour: RandomWalk::new(1000.0),
             propagation_params: FreeSpaceParams::new(
                 8.0,
                 0.34538301613, // 868mhz in metres

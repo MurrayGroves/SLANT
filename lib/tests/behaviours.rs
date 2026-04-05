@@ -170,7 +170,7 @@ fn test_flood() {
 
     let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, FreeSpace);
 
-    sim = sim.n_ticks(10);
+    sim.n_ticks(10);
 
     let mut received_packets = 0;
     let mut originated_packets = 0;

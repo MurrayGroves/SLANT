@@ -33,43 +33,43 @@ fn ten_ticks_random_walk() {
         NodeInit {
             starting_position: [0.0, 0.0],
             node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new([0.0, 1.0]),
+            move_behaviour: RandomWalk::new(1.0),
             propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [1.0, 0.0],
             node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new([1.0, 1.0]),
+            move_behaviour: RandomWalk::new(1.0),
             propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [1.0, 1.0],
             node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new([1.0, 0.0]),
+            move_behaviour: RandomWalk::new(1.0),
             propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [0.0, 1.0],
             node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new([-1.0, 1.0]),
+            move_behaviour: RandomWalk::new(1.0),
             propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [1.0, 0.0],
             node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new([1.0, -3.0]),
+            move_behaviour: RandomWalk::new(1.0),
             propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [1.0, 5.0],
             node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new([6.0, 1.0]),
+            move_behaviour: RandomWalk::new(1.0),
             propagation_params: propagation_params.clone(),
         },
         NodeInit {
             starting_position: [1.0, 0.0],
             node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new([3.0, 1.0]),
+            move_behaviour: RandomWalk::new(1.0),
             propagation_params,
         },
     ];
@@ -92,11 +92,11 @@ fn ten_ticks_random_walk() {
             5,
             5,
         );
-        sim_manager = sim_manager.n_ticks(1);
+        sim_manager.n_ticks(1);
     }
 
     let ctr = packet_counter.lock().unwrap();
-    assert_eq!(*ctr, 42);
+    assert_eq!(*ctr, 48);
 
     assert!(
         sim_manager
