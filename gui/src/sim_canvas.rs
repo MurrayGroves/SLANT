@@ -24,7 +24,7 @@ struct Node {
 pub struct SimCanvas {
     pub nodes: Vec<NodeData<f32, 2, FreeSpaceParams<f32, 2>>>,
     pub events: Vec<InternalEvent>,
-    pub reset: Arc<Mutex<bool>>,
+    pub reset: Arc<Mutex<usize>>,
 }
 
 impl Program<Message, cosmic::Theme> for SimCanvas {
@@ -39,9 +39,11 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
         cursor: Cursor,
     ) -> Vec<Geometry<Renderer>> {
         let mut reset = self.reset.lock().unwrap();
-        if *reset {
+        if *reset > 1 {
+            *reset -= 1;
+        } else if *reset == 1 {
             state.clear();
-            *reset = false;
+            *reset = 0;
         }
 
         let geometry = state.draw(renderer, bounds.size(), |frame| {

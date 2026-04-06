@@ -37,6 +37,7 @@ struct SimData {
 enum Message {
     SimData(SimData),
     Tick,
+    NewStatus(String),
 }
 
 impl cosmic::Application for App {
@@ -68,7 +69,7 @@ impl cosmic::Application for App {
                     .map(|x| x.data().clone())
                     .collect(),
                 events: Vec::new(),
-                reset: Arc::new(Mutex::new(false)),
+                reset: Arc::new(Mutex::new(0)),
             },
             sim: Arc::new(RwLock::new(sim)),
             status_text: "".to_string(),
@@ -94,11 +95,11 @@ impl cosmic::Application for App {
                 self.sim_canvas.events = x.events;
                 self.sim_canvas.nodes = x.nodes;
                 let mut reset = self.sim_canvas.reset.lock().unwrap();
-                *reset = true;
+                *reset = 2;
 
                 debug!("Updated sim data");
-                self.status_text = "".to_string();
-                cosmic::task::none()
+                self.status_text = "Rendering new state".to_string();
+                cosmic::task::message(Message::NewStatus("".to_string()))
             }
             Message::Tick => {
                 // Spawn task to tick sim
@@ -126,6 +127,10 @@ impl cosmic::Application for App {
 
                     Message::SimData(result)
                 })
+            }
+            Message::NewStatus(x) => {
+                self.status_text = x;
+                cosmic::task::none()
             }
         }
     }
