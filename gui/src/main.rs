@@ -4,6 +4,7 @@ mod sim_canvas;
 use crate::iced::widget::button;
 use crate::sim::{SimConf, generate_nodes};
 use crate::sim_canvas::SimCanvas;
+use cosmic::iced::alignment::Vertical;
 use cosmic::iced::application::ViewFn;
 use cosmic::iced_core::id::A11yId::Widget;
 use cosmic::prelude::*;
@@ -25,6 +26,9 @@ struct App {
     sim: Arc<RwLock<manetsim::types::SimManager<f32, 2, SimConf>>>,
     sim_canvas: SimCanvas,
     status_text: String,
+    tick: usize,
+    transmit_count: usize,
+    link_count: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +77,9 @@ impl cosmic::Application for App {
             },
             sim: Arc::new(RwLock::new(sim)),
             status_text: "".to_string(),
+            tick: 0,
+            link_count: 0,
+            transmit_count: 0,
         };
 
         let command = app.set_window_title("Manetsim".to_string(), iced::window::Id::unique());
@@ -83,15 +90,40 @@ impl cosmic::Application for App {
         let canvas = canvas(self.sim_canvas.clone())
             .width(iced::Length::Fill)
             .height(iced::Length::Fill);
-        let button = widget::button::text("Tick").on_press(Message::Tick);
-        let status =
-            widget::row::with_children(vec![button.into(), widget::text(&self.status_text).into()]);
+        let button = widget::button::text("Tick").on_press(Message::Tick).into();
+        let tick = widget::text(format!("Tick: {}", self.tick))
+            .center()
+            .align_y(Vertical::Center)
+            .into();
+        let transmit_count = widget::text(format!("Transmits: {}", self.transmit_count))
+            .align_y(Vertical::Center)
+            .into();
+        let link_count = widget::text(format!("Receives: {}", self.link_count))
+            .align_y(Vertical::Center)
+            .into();
+        let status = widget::row::with_children(vec![
+            button,
+            tick,
+            transmit_count,
+            link_count,
+            widget::text(&self.status_text).into(),
+        ])
+        .align_y(Vertical::Center)
+        .spacing(10);
         widget::column::with_children(vec![canvas.into(), status.into()]).into()
     }
 
     fn update(&mut self, message: Self::Message) -> cosmic::app::Task<Self::Message> {
         match message {
             Message::SimData(x) => {
+                self.tick += 1;
+                self.transmit_count = 0;
+                self.link_count = 0;
+                x.events.iter().for_each(|e| match e {
+                    InternalEvent::PacketTransmit(_) => self.transmit_count += 1,
+                    InternalEvent::PacketLink(_) => self.link_count += 1,
+                });
+
                 self.sim_canvas.events = x.events;
                 self.sim_canvas.nodes = x.nodes;
                 let mut reset = self.sim_canvas.reset.lock().unwrap();
