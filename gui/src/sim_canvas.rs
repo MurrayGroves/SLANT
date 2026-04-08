@@ -14,6 +14,7 @@ use manetsim::stats::InternalEvent;
 use manetsim::stats::InternalEvent::PacketLink;
 use manetsim::types::NodeData;
 use num_traits::float::Float;
+use std::cmp::min;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -28,6 +29,10 @@ pub struct SimCanvas {
     pub nodes: Vec<NodeData<f32, 2, FreeSpaceParams<f32, 2>>>,
     pub events: Vec<InternalEvent>,
     pub reset: Arc<Mutex<usize>>,
+    /// Value to multiply sim coordinates by to get screen coordinates
+    pub unit_ratio: Arc<Mutex<Option<f32>>>,
+    /// Zoom step level, zero for base, higher is more zoomed in
+    pub zoom: f32,
 }
 
 pub struct CanvasState {
@@ -108,35 +113,45 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
             debug!("Drawing nodes");
             let start = Instant::now();
 
-            let mut min_x = f32::infinity();
-            let mut min_y = f32::infinity();
-            let mut max_x = f32::neg_infinity();
-            let mut max_y = f32::neg_infinity();
+            let mut unit_ratio = self.unit_ratio.lock().unwrap();
+            let unit_ratio = match *unit_ratio {
+                Some(x) => x,
+                None => {
+                    let mut min_x = f32::infinity();
+                    let mut min_y = f32::infinity();
+                    let mut max_x = f32::neg_infinity();
+                    let mut max_y = f32::neg_infinity();
 
-            for node in &self.nodes {
-                if node.position[0] < min_x {
-                    min_x = node.position[0];
-                }
-                if node.position[0] > max_x {
-                    max_x = node.position[0];
-                }
-                if node.position[1] < min_y {
-                    min_y = node.position[1];
-                }
-                if node.position[1] > max_y {
-                    max_y = node.position[1];
-                }
-            }
+                    for node in &self.nodes {
+                        if node.position[0] < min_x {
+                            min_x = node.position[0];
+                        }
+                        if node.position[0] > max_x {
+                            max_x = node.position[0];
+                        }
+                        if node.position[1] < min_y {
+                            min_y = node.position[1];
+                        }
+                        if node.position[1] > max_y {
+                            max_y = node.position[1];
+                        }
+                    }
 
-            let x_ratio: f32 = (bounds.size().width * 0.9 / (max_x - min_x));
-            let y_ratio: f32 = (bounds.size().height * 0.9 / (max_y - min_y));
+                    let x_ratio: f32 = (bounds.size().width * 0.9 / (max_x - min_x));
+                    let y_ratio: f32 = (bounds.size().height * 0.9 / (max_y - min_y));
+                    let ratio = f32::min(x_ratio, y_ratio);
+                    *unit_ratio = Some(ratio);
+                    ratio
+                }
+            };
+
             let background = canvas::Path::rectangle(Point::new(0.0, 0.0), bounds.size());
             frame.fill(&background, Color::WHITE);
 
             for node in &self.nodes {
                 let position = Point::new(
-                    (node.position[0] - min_x) * x_ratio + (0.05 * bounds.size().width),
-                    (node.position[1] - min_y) * y_ratio + (0.05 * bounds.size().height),
+                    node.position[0] * unit_ratio + (0.05 * bounds.size().width),
+                    node.position[1] * unit_ratio + (0.05 * bounds.size().height),
                 );
                 let circle = canvas::Path::circle(position, 3.0);
                 frame.fill(&circle, Color::BLACK);

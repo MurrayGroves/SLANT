@@ -1,11 +1,13 @@
 mod sim;
 mod sim_canvas;
 
+use crate::Message::CanvasScroll;
 use crate::iced::widget::button;
 use crate::sim::{SimConf, generate_nodes};
 use crate::sim_canvas::SimCanvas;
 use cosmic::iced::alignment::Vertical;
 use cosmic::iced::application::ViewFn;
+use cosmic::iced::mouse::ScrollDelta;
 use cosmic::iced_core::id::A11yId::Widget;
 use cosmic::prelude::*;
 use cosmic::widget::{Canvas, canvas, container};
@@ -42,6 +44,7 @@ enum Message {
     SimData(SimData),
     Tick,
     NewStatus(String),
+    CanvasScroll(ScrollDelta),
 }
 
 impl cosmic::Application for App {
@@ -74,6 +77,8 @@ impl cosmic::Application for App {
                     .collect(),
                 events: Vec::new(),
                 reset: Arc::new(Mutex::new(0)),
+                unit_ratio: Arc::new(Mutex::new(None)),
+                zoom: 0.0,
             },
             sim: Arc::new(RwLock::new(sim)),
             status_text: "".to_string(),
@@ -87,9 +92,13 @@ impl cosmic::Application for App {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let canvas = canvas(self.sim_canvas.clone())
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill);
+        let canvas = widget::mouse_area(
+            canvas(self.sim_canvas.clone())
+                .width(iced::Length::Fill)
+                .height(iced::Length::Fill),
+        )
+        .on_scroll(|e| CanvasScroll(e));
+
         let button = widget::button::text("Tick").on_press(Message::Tick).into();
         let tick = widget::text(format!("Tick: {}", self.tick))
             .center()
@@ -162,6 +171,13 @@ impl cosmic::Application for App {
             }
             Message::NewStatus(x) => {
                 self.status_text = x;
+                cosmic::task::none()
+            }
+            Message::CanvasScroll(e) => {
+                self.sim_canvas.zoom += match e {
+                    ScrollDelta::Lines { x, y } => y,
+                    ScrollDelta::Pixels { x, y } => y,
+                };
                 cosmic::task::none()
             }
         }
