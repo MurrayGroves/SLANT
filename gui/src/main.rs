@@ -8,6 +8,7 @@ use crate::sim_canvas::SimCanvas;
 use cosmic::iced::alignment::Vertical;
 use cosmic::iced::application::ViewFn;
 use cosmic::iced::mouse::ScrollDelta;
+use cosmic::iced::{Point, Vector};
 use cosmic::iced_core::id::A11yId::Widget;
 use cosmic::prelude::*;
 use cosmic::widget::{Canvas, canvas, container};
@@ -45,6 +46,9 @@ enum Message {
     Tick,
     NewStatus(String),
     CanvasScroll(ScrollDelta),
+    MouseDown,
+    MouseUp,
+    MouseMove(Point),
 }
 
 impl cosmic::Application for App {
@@ -79,6 +83,9 @@ impl cosmic::Application for App {
                 reset: Arc::new(Mutex::new(0)),
                 unit_ratio: Arc::new(Mutex::new(None)),
                 zoom: 0.0,
+                move_pos: Vector::ZERO,
+                mouse_down: false,
+                current_mouse_pos: None,
             },
             sim: Arc::new(RwLock::new(sim)),
             status_text: "".to_string(),
@@ -97,7 +104,10 @@ impl cosmic::Application for App {
                 .width(iced::Length::Fill)
                 .height(iced::Length::Fill),
         )
-        .on_scroll(|e| CanvasScroll(e));
+        .on_scroll(|e| CanvasScroll(e))
+        .on_press(Message::MouseDown)
+        .on_release(Message::MouseUp)
+        .on_move(|p| Message::MouseMove(p));
 
         let button = widget::button::text("Tick").on_press(Message::Tick).into();
         let tick = widget::text(format!("Tick: {}", self.tick))
@@ -180,6 +190,29 @@ impl cosmic::Application for App {
                 };
                 debug!("New zoom level: {}", self.sim_canvas.zoom);
                 *self.sim_canvas.reset.lock().unwrap() = 1;
+                cosmic::task::none()
+            }
+            Message::MouseDown => {
+                self.sim_canvas.mouse_down = true;
+                cosmic::task::none()
+            }
+            Message::MouseUp => {
+                self.sim_canvas.mouse_down = false;
+                self.sim_canvas.current_mouse_pos = None;
+                cosmic::task::none()
+            }
+            Message::MouseMove(p) => {
+                if !self.sim_canvas.mouse_down {
+                    return cosmic::task::none();
+                };
+
+                if let Some(old) = self.sim_canvas.current_mouse_pos {
+                    let diff = p - old;
+
+                    self.sim_canvas.move_pos += diff;
+                    *self.sim_canvas.reset.lock().unwrap() = 1;
+                }
+                self.sim_canvas.current_mouse_pos = Some(p);
                 cosmic::task::none()
             }
         }
