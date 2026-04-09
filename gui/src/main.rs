@@ -178,6 +178,8 @@ impl cosmic::Application for App {
                     ScrollDelta::Lines { x, y } => y,
                     ScrollDelta::Pixels { x, y } => y,
                 };
+                debug!("New zoom level: {}", self.sim_canvas.zoom);
+                *self.sim_canvas.reset.lock().unwrap() = 1;
                 cosmic::task::none()
             }
         }

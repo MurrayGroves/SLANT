@@ -79,6 +79,9 @@ impl CanvasState {
     const TRANSMITS_PER_CACHE: usize = 500_000;
 }
 
+impl SimCanvas {
+    const ZOOM_EXPONENT: f32 = 1.2;
+}
 impl Program<Message, cosmic::Theme> for SimCanvas {
     type State = CanvasState;
 
@@ -114,7 +117,7 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
             let start = Instant::now();
 
             let mut unit_ratio = self.unit_ratio.lock().unwrap();
-            let unit_ratio = match *unit_ratio {
+            let unit_ratio = (match *unit_ratio {
                 Some(x) => x,
                 None => {
                     let mut min_x = f32::infinity();
@@ -143,7 +146,7 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                     *unit_ratio = Some(ratio);
                     ratio
                 }
-            };
+            }) * SimCanvas::ZOOM_EXPONENT.powf(self.zoom);
 
             let background = canvas::Path::rectangle(Point::new(0.0, 0.0), bounds.size());
             frame.fill(&background, Color::WHITE);
@@ -200,12 +203,14 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                                 // Arrowhead
                                 let diff = src - dst;
                                 let length = (diff.x.powi(2) + diff.y.powi(2)).sqrt();
-                                let unit = (diff / length) * 8.0;
+                                let unit = (diff / length)
+                                    * 4.0
+                                    * SimCanvas::ZOOM_EXPONENT.powf(self.zoom);
                                 let left_wing =
-                                    Transform2D::<f32, f32, f32>::rotation(Angle::degrees(-30.0))
+                                    Transform2D::<f32, f32, f32>::rotation(Angle::degrees(-15.0))
                                         .transform_vector(Vector2D::new(unit.x, unit.y));
                                 let right_wing =
-                                    Transform2D::<f32, f32, f32>::rotation(Angle::degrees(30.0))
+                                    Transform2D::<f32, f32, f32>::rotation(Angle::degrees(15.0))
                                         .transform_vector(Vector2D::new(unit.x, unit.y));
 
                                 frame.stroke(
