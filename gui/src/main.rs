@@ -34,6 +34,7 @@ struct App {
     tick: usize,
     transmit_count: usize,
     link_count: usize,
+    paused: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -51,6 +52,7 @@ enum Message {
     MouseDown,
     MouseUp,
     MouseMove(Point),
+    TogglePause,
 }
 
 impl cosmic::Application for App {
@@ -94,6 +96,7 @@ impl cosmic::Application for App {
             tick: 0,
             link_count: 0,
             transmit_count: 0,
+            paused: true,
         };
 
         let command = app.set_window_title("Manetsim".to_string(), iced::window::Id::unique());
@@ -111,6 +114,10 @@ impl cosmic::Application for App {
         .on_release(Message::MouseUp)
         .on_move(|p| Message::MouseMove(p));
 
+        let play_pause_text = if self.paused { "Start" } else { "Pause" };
+        let play_pause = widget::button::text(play_pause_text)
+            .on_press(Message::TogglePause)
+            .into();
         let button = widget::button::text("Tick").on_press(Message::Tick).into();
         let tick = widget::text(format!("Tick: {}", self.tick))
             .center()
@@ -123,6 +130,7 @@ impl cosmic::Application for App {
             .align_y(Vertical::Center)
             .into();
         let status = widget::row::with_children(vec![
+            play_pause,
             button,
             tick,
             transmit_count,
@@ -152,9 +160,23 @@ impl cosmic::Application for App {
 
                 debug!("Updated sim data");
                 self.status_text = "Rendering new state".to_string();
-                cosmic::task::message(Message::NewStatus("".to_string()))
+                if !self.paused {
+                    cosmic::task::message(Message::NewStatus("".to_string()))
+                        .chain(cosmic::task::message(Message::Tick))
+                } else {
+                    cosmic::task::message(Message::NewStatus("".to_string()))
+                }
             }
             Message::Tick => {
+                if self.tick > 500 {
+                    self.tick = 0;
+
+                    let nodes = generate_nodes(4096, 3_000.0);
+
+                    let sim: SimManager<_, _, SimConf> =
+                        SimManager::new(nodes, 123456, SimpleDistance);
+                    self.sim = Arc::new(RwLock::new(sim));
+                }
                 // Spawn task to tick sim
                 let sim = Arc::clone(&self.sim);
                 self.status_text = "running tick".to_string();
@@ -216,6 +238,14 @@ impl cosmic::Application for App {
                 }
                 self.sim_canvas.current_mouse_pos = Some(p);
                 cosmic::task::none()
+            }
+            Message::TogglePause => {
+                self.paused = !self.paused;
+                if !self.paused {
+                    cosmic::task::message(Message::Tick)
+                } else {
+                    cosmic::task::none()
+                }
             }
         }
     }

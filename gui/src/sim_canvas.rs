@@ -80,7 +80,7 @@ impl CanvasState {
         }
     }
 
-    const TRANSMITS_PER_CACHE: usize = 500_000;
+    const TRANSMITS_PER_CACHE: usize = 300_000;
 }
 
 impl SimCanvas {
