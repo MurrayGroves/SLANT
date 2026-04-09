@@ -16,7 +16,9 @@ use cosmic::{Core, iced, widget};
 use log::debug;
 use manetsim::example_behaviours::RandomWalk;
 use manetsim::example_behaviours::flood::Flood;
-use manetsim::propagation_models::{FreeSpace, FreeSpaceParams};
+use manetsim::propagation_models::{
+    FreeSpace, FreeSpaceParams, SimpleDistance, SimpleDistanceParams,
+};
 use manetsim::stats::InternalEvent;
 use manetsim::types::{NodeData, SimConfig, SimManager};
 use std::sync::{Arc, Mutex};
@@ -36,7 +38,7 @@ struct App {
 
 #[derive(Debug, Clone)]
 struct SimData {
-    nodes: Vec<NodeData<f32, 2, FreeSpaceParams<f32, 2>>>,
+    nodes: Vec<NodeData<f32, 2, SimpleDistanceParams<f32, 2>>>,
     events: Vec<InternalEvent>,
 }
 
@@ -67,9 +69,9 @@ impl cosmic::Application for App {
     }
 
     fn init(core: Core, flags: Self::Flags) -> (Self, cosmic::app::Task<Self::Message>) {
-        let nodes = generate_nodes(1024, 3_000.0);
+        let nodes = generate_nodes(4096, 3_000.0);
 
-        let sim: SimManager<_, _, SimConf> = SimManager::new(nodes, 123456, FreeSpace);
+        let sim: SimManager<_, _, SimConf> = SimManager::new(nodes, 123456, SimpleDistance);
         let mut app = App {
             core,
             sim_canvas: SimCanvas {

@@ -10,7 +10,7 @@ use cosmic::widget::canvas::path::lyon_path::geom::{Angle, Transform, euclid};
 use cosmic::widget::canvas::{Cache, Frame, Program, Stroke};
 use cosmic::{iced, iced_core};
 use log::debug;
-use manetsim::propagation_models::FreeSpaceParams;
+use manetsim::propagation_models::{FreeSpaceParams, SimpleDistanceParams};
 use manetsim::stats::InternalEvent;
 use manetsim::stats::InternalEvent::PacketLink;
 use manetsim::types::NodeData;
@@ -27,7 +27,7 @@ struct Node {
 
 #[derive(Debug, Clone)]
 pub struct SimCanvas {
-    pub nodes: Vec<NodeData<f32, 2, FreeSpaceParams<f32, 2>>>,
+    pub nodes: Vec<NodeData<f32, 2, SimpleDistanceParams<f32, 2>>>,
     pub events: Vec<InternalEvent>,
     pub reset: Arc<Mutex<usize>>,
     /// Value to multiply sim coordinates by to get screen coordinates
@@ -204,7 +204,6 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                             "Drawing links for cache {}, with {} live caches",
                             i, *live_count
                         );
-                        let mut rand = rand::rng();
                         for e in link_events {
                             if let PacketLink(e) = e {
                                 let src = node_vis.get(e.0).unwrap().position;
@@ -219,7 +218,7 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                                 let diff = src - dst;
                                 let length = (diff.x.powi(2) + diff.y.powi(2)).sqrt();
                                 let unit = (diff / length)
-                                    * 2.0
+                                    * 8.0
                                     * SimCanvas::ZOOM_EXPONENT.powf(self.zoom);
                                 let left_wing =
                                     Transform2D::<f32, f32, f32>::rotation(Angle::degrees(-8.0))
@@ -245,20 +244,15 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
 
                                 frame.stroke(&packet_path, Stroke::default().with_color(colour));
 
-                                frame.stroke(
-                                    &canvas::path::Path::line(
-                                        dst,
-                                        dst + iced_core::Vector::new(left_wing.x, left_wing.y),
-                                    ),
-                                    Stroke::default().with_color(colour),
-                                );
-                                frame.stroke(
-                                    &canvas::path::Path::line(
-                                        dst,
-                                        dst + iced_core::Vector::new(right_wing.x, right_wing.y),
-                                    ),
-                                    Stroke::default().with_color(colour),
-                                );
+                                let left_wing = dst + Vector::new(left_wing.x, left_wing.y);
+                                let right_wing = dst + Vector::new(right_wing.x, right_wing.y);
+
+                                let tri = canvas::path::Path::new(|path| {
+                                    path.move_to(left_wing);
+                                    path.line_to(right_wing);
+                                    path.line_to(dst)
+                                });
+                                frame.fill(&tri, colour);
                             } else {
                                 panic!("Non-packet link in wrong vector");
                             }
