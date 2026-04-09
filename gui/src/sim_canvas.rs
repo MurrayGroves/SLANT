@@ -2,11 +2,12 @@ use crate::Message;
 use cosmic::iced::mouse::Cursor;
 use cosmic::iced::theme::Style;
 use cosmic::iced::{Color, Point, Rectangle, Renderer, Theme, Vector};
+use cosmic::iced_renderer::geometry::frame::Backend;
 use cosmic::iced_widget::canvas::Geometry;
 use cosmic::widget::canvas;
 use cosmic::widget::canvas::path::lyon_path::geom::euclid::{Transform2D, Vector2D};
 use cosmic::widget::canvas::path::lyon_path::geom::{Angle, Transform, euclid};
-use cosmic::widget::canvas::{Cache, Program, Stroke};
+use cosmic::widget::canvas::{Cache, Frame, Program, Stroke};
 use cosmic::{iced, iced_core};
 use log::debug;
 use manetsim::propagation_models::FreeSpaceParams;
@@ -96,6 +97,10 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
         bounds: Rectangle,
         cursor: Cursor,
     ) -> Vec<Geometry<Renderer>> {
+        let mut frame = Frame::new(renderer, bounds.size());
+        let background = canvas::Path::rectangle(Point::new(0.0, 0.0), bounds.size());
+        frame.fill(&background, Color::WHITE);
+
         let mut reset = self.reset.lock().unwrap();
         if *reset > 1 {
             *reset -= 1;
@@ -151,9 +156,6 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                 }
             }) * SimCanvas::ZOOM_EXPONENT.powf(self.zoom);
 
-            let background = canvas::Path::rectangle(Point::new(0.0, 0.0), bounds.size());
-            frame.fill(&background, Color::WHITE);
-
             for node in &self.nodes {
                 let position = Point::new(
                     node.position[0] * unit_ratio + (0.05 * bounds.size().width),
@@ -161,7 +163,9 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                 ) + self.move_pos;
 
                 let circle = canvas::Path::circle(position, 3.0);
-                frame.fill(&circle, Color::BLACK);
+                if bounds.contains(position) {
+                    frame.fill(&circle, Color::BLACK);
+                }
                 node_vis.push(Node { circle, position })
             }
 
@@ -169,7 +173,9 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                 match event {
                     InternalEvent::PacketTransmit(e) => {
                         let node = node_vis.get(e).unwrap();
-                        frame.fill(&node.circle, Color::from_rgb(0.0, 1.0, 0.0));
+                        if bounds.contains(node.position) {
+                            frame.fill(&node.circle, Color::from_rgb(0.0, 1.0, 0.0));
+                        }
                     }
                     InternalEvent::PacketLink(e) => {
                         panic!("Packet link in wrong vector");
@@ -202,6 +208,10 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                             if let PacketLink(e) = e {
                                 let src = node_vis.get(e.0).unwrap().position;
                                 let dst = node_vis.get(e.1).unwrap().position;
+                                if !bounds.contains(src) && !bounds.contains(dst) {
+                                    continue;
+                                }
+
                                 let packet_path = canvas::Path::line(src, dst);
 
                                 // Arrowhead
@@ -247,8 +257,9 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
             Vec::new()
         };
 
-        let mut out = vec![nodes];
+        let mut out = vec![frame.into_geometry()];
         out.extend(transmit_geometries);
+        out.push(nodes);
         out
     }
 }
