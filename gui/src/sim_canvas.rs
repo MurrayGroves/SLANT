@@ -204,6 +204,7 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                             "Drawing links for cache {}, with {} live caches",
                             i, *live_count
                         );
+                        let mut rand = rand::rng();
                         for e in link_events {
                             if let PacketLink(e) = e {
                                 let src = node_vis.get(e.0).unwrap().position;
@@ -227,24 +228,36 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                                     Transform2D::<f32, f32, f32>::rotation(Angle::degrees(8.0))
                                         .transform_vector(Vector2D::new(unit.x, unit.y));
 
-                                frame.stroke(
-                                    &packet_path,
-                                    Stroke::default().with_color(Color::from_rgb(0.0, 0.0, 1.0)),
-                                );
+                                // let mut colour = Color::from_rgb(
+                                //     rand.random::<f32>(),
+                                //     rand.random::<f32>(),
+                                //     rand.random::<f32>(),
+                                // );
+                                //
+                                // while !colour.is_readable_on(Color::WHITE) {
+                                //     colour = Color::from_rgb(
+                                //         rand.random::<f32>(),
+                                //         rand.random::<f32>(),
+                                //         rand.random::<f32>(),
+                                //     );
+                                // }
+                                let colour = Color::from_rgba(0.0, 0.0, 1.0, 0.05);
+
+                                frame.stroke(&packet_path, Stroke::default().with_color(colour));
 
                                 frame.stroke(
                                     &canvas::path::Path::line(
                                         dst,
                                         dst + iced_core::Vector::new(left_wing.x, left_wing.y),
                                     ),
-                                    Stroke::default().with_color(Color::from_rgb(0.0, 0.0, 1.0)),
+                                    Stroke::default().with_color(colour),
                                 );
                                 frame.stroke(
                                     &canvas::path::Path::line(
                                         dst,
                                         dst + iced_core::Vector::new(right_wing.x, right_wing.y),
                                     ),
-                                    Stroke::default().with_color(Color::from_rgb(0.0, 0.0, 1.0)),
+                                    Stroke::default().with_color(colour),
                                 );
                             } else {
                                 panic!("Non-packet link in wrong vector");
