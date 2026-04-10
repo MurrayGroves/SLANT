@@ -22,7 +22,7 @@ pub trait PropagationParams<A: Coord<K>, const K: usize>: Clone + Sized + Send +
 #[derive(Clone, Copy)]
 pub struct SimpleDistance;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SimpleDistanceParams<A: Coord<K>, const K: usize> {
     pub transmit_distance: A,
 }

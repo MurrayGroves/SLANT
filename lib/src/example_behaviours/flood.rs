@@ -15,6 +15,8 @@ pub struct Flood<PT: FloodPacket<A, K> + Clone + ?Sized, A: Coord<K>, const K: u
     coord_type: PhantomData<A>,
     /// Seq of most recent packet generated
     seq: Arc<Mutex<PT::S>>,
+    /// Hop count for new packets
+    hop_count: usize,
 }
 
 pub trait FloodPacket<A: Coord<K>, const K: usize>:
@@ -86,11 +88,12 @@ where
 }
 
 impl<PT: FloodPacket<A, K> + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
-    pub fn new() -> Self {
+    pub fn new(hops: usize) -> Self {
         Self {
             seen_packets: Arc::new(Mutex::new(HashSet::new())),
             coord_type: PhantomData,
             seq: Arc::new(Mutex::new(PT::S::zero())),
+            hop_count: hops,
         }
     }
 
@@ -102,7 +105,7 @@ impl<PT: FloodPacket<A, K> + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K>
         let mut seq = self.seq.lock().unwrap();
         let packet = PT::new(
             data,
-            <<PT as FloodPacket<A, K>>::H as NumCast>::from(5).unwrap(),
+            <<PT as FloodPacket<A, K>>::H as NumCast>::from(self.hop_count).unwrap(),
             *seq,
             content,
         );

@@ -4,7 +4,7 @@ use lazy_static::lazy_static;
 use log::trace;
 use manetsim::example_behaviours::RandomWalk;
 use manetsim::propagation_models::{
-    PropagationModel, PropagationParams, SimpleDistance, SimpleDistanceParams,
+    FreeSpaceParams, PropagationModel, PropagationParams, SimpleDistance, SimpleDistanceParams,
 };
 use manetsim::traffic_generators::mixed_multicast_and_random_target_unicast;
 use manetsim::types::{
@@ -15,6 +15,7 @@ use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
 use std::sync::{Arc, Mutex};
 
+use crate::common::behaviours::StaticMovement;
 use common::behaviours::{LoggerNode, packet_counter};
 
 #[test]

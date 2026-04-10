@@ -9,6 +9,7 @@ use manetsim::propagation_models::{
 use manetsim::types::{
     Coord, GlobalStateManager, NodeBehaviour, NodeData, NodeID, NodeInit, SimConfig, SimManager,
 };
+use std::env;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::BitAnd;
 use std::sync::Arc;
@@ -116,7 +117,7 @@ impl NodeBehaviour<f32, 2, FreeSpaceParams<f32, 2>> for MonotonicFlood {
 
 impl MonotonicFlood {
     fn new() -> Self {
-        let flood = Flood::new();
+        let flood = Flood::new(5);
         let clone = flood.clone();
         Self {
             monotonic: Monotonic::new(
@@ -158,7 +159,12 @@ fn generate_nodes(
 fn test_flood() {
     env_logger::init();
 
-    let nodes = generate_nodes(1024, 3_000.0);
+    let num_nodes = env::var("NUM_NODES")
+        .unwrap_or("1024".into())
+        .parse::<usize>()
+        .unwrap();
+
+    let nodes = generate_nodes(num_nodes, 3_000.0);
 
     struct TestConfig;
     impl SimConfig<f32, 2> for TestConfig {
