@@ -3,7 +3,7 @@ mod sim_canvas;
 
 use crate::Message::CanvasScroll;
 use crate::iced::widget::button;
-use crate::sim::{SimConf, generate_nodes};
+use crate::sim::{SeqPacketTransmit, SimConf, generate_nodes};
 use crate::sim_canvas::SimCanvas;
 use cosmic::iced::alignment::Vertical;
 use cosmic::iced::application::ViewFn;
@@ -22,9 +22,10 @@ use manetsim::propagation_models::{
 use manetsim::stats::InternalEvent;
 use manetsim::types::{NodeData, SimConfig, SimManager};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::task::spawn_blocking;
-use tokio::time::Instant;
+use tokio::time::{Instant, sleep};
 
 struct App {
     core: cosmic::Core,
@@ -41,6 +42,7 @@ struct App {
 struct SimData {
     nodes: Vec<NodeData<f32, 2, SimpleDistanceParams<f32, 2>>>,
     events: Vec<InternalEvent>,
+    seq_transmits: Vec<SeqPacketTransmit<u16>>,
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +86,7 @@ impl cosmic::Application for App {
                     .map(|x| x.data().clone())
                     .collect(),
                 events: Vec::new(),
+                seq_transmits: Vec::new(),
                 reset: Arc::new(Mutex::new(0)),
                 unit_ratio: Arc::new(Mutex::new(None)),
                 zoom: 0.0,
@@ -154,6 +157,8 @@ impl cosmic::Application for App {
                 });
 
                 self.sim_canvas.events = x.events;
+                debug!("Seq transmits len: {}", x.seq_transmits.len());
+                self.sim_canvas.seq_transmits = x.seq_transmits;
                 self.sim_canvas.nodes = x.nodes;
                 let mut reset = self.sim_canvas.reset.lock().unwrap();
                 *reset = 2;
@@ -182,10 +187,12 @@ impl cosmic::Application for App {
                 self.status_text = "running tick".to_string();
                 cosmic::task::future(async move {
                     let result = tokio::task::spawn_blocking(async move || {
+                        sleep(Duration::from_millis(200)).await;
                         let mut sim = sim.write().await;
                         let start = Instant::now();
                         sim.n_ticks(1);
                         debug!("Tick finished after {:?}", start.elapsed());
+                        let stats = sim.global_state_manager.consume_stats().events();
                         SimData {
                             nodes: sim
                                 .global_state_manager
@@ -193,7 +200,8 @@ impl cosmic::Application for App {
                                 .iter()
                                 .map(|x| x.data().clone())
                                 .collect(),
-                            events: sim.global_state_manager.consume_stats().events(),
+                            events: stats.0,
+                            seq_transmits: stats.1,
                         }
                     })
                     .await

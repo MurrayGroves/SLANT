@@ -1,4 +1,5 @@
 use crate::Message;
+use crate::sim::SeqPacketTransmit;
 use cosmic::iced::mouse::Cursor;
 use cosmic::iced::theme::Style;
 use cosmic::iced::{Color, Point, Rectangle, Renderer, Theme, Vector};
@@ -29,6 +30,7 @@ struct Node {
 pub struct SimCanvas {
     pub nodes: Vec<NodeData<f32, 2, SimpleDistanceParams<f32, 2>>>,
     pub events: Vec<InternalEvent>,
+    pub seq_transmits: Vec<SeqPacketTransmit<u16>>,
     pub reset: Arc<Mutex<usize>>,
     /// Value to multiply sim coordinates by to get screen coordinates
     pub unit_ratio: Arc<Mutex<Option<f32>>>,
@@ -169,17 +171,30 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                 node_vis.push(Node { circle, position })
             }
 
-            for event in events {
-                match event {
-                    InternalEvent::PacketTransmit(e) => {
-                        let node = node_vis.get(e).unwrap();
-                        if bounds.contains(node.position) {
-                            frame.fill(&node.circle, Color::from_rgb(0.0, 1.0, 0.0));
-                        }
-                    }
-                    InternalEvent::PacketLink(e) => {
-                        panic!("Packet link in wrong vector");
-                    }
+            for event in &self.seq_transmits {
+                let node = node_vis.get(event.node).unwrap();
+                if bounds.contains(node.position) {
+                    // Convert seq to HSL to RGB
+                    let norm: f32 = event.seq as f32 / u16::MAX as f32;
+
+                    let h = norm * 6.0;
+                    let sector = h as usize;
+
+                    let x = 1.0 - ((h % 2.0) - 1.0).abs();
+
+                    let (r, g, b) = match sector {
+                        0 => (1.0, x, 0.0),
+                        1 => (x, 1.0, 0.0),
+                        2 => (0.0, 1.0, x),
+                        3 => (0.0, x, 1.0),
+                        4 => (x, 0.0, 1.0),
+                        _ => (1.0, 0.0, x), // Sector 5 (and edge case 6.0)
+                    };
+
+                    let r = (r * 255.0) as u8;
+                    let g = (g * 255.0) as u8;
+                    let b = (b * 255.0) as u8;
+                    frame.fill(&node.circle, Color::from_rgb8(r, g, b));
                 }
             }
 
@@ -240,7 +255,7 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                                 //         rand.random::<f32>(),
                                 //     );
                                 // }
-                                let colour = Color::from_rgba(0.0, 0.0, 1.0, 0.05);
+                                let colour = Color::from_rgba(0.0, 0.0, 1.0, 0.2);
 
                                 frame.stroke(&packet_path, Stroke::default().with_color(colour));
 
