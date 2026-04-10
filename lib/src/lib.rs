@@ -1,5 +1,6 @@
 #![feature(sync_unsafe_cell)]
 #![feature(adt_const_params)]
+#![feature(associated_type_defaults)]
 extern crate core;
 
 pub mod types;

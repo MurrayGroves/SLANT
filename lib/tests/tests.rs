@@ -81,6 +81,7 @@ fn ten_ticks_random_walk() {
         type NB = LoggerNode;
         type PM = SimpleDistance;
         type S = ();
+        type E = ();
     }
 
     let mut sim_manager: SimManager<_, _, TestSimConfig> =

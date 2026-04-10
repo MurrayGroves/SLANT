@@ -98,7 +98,8 @@ impl NodeBehaviour<f32, 2, FreeSpaceParams<f32, 2>> for MonotonicFlood {
                 f32,
                 2,
                 PM = impl PropagationModel<f32, 2, P = FreeSpaceParams<f32, 2>>,
-                NB = impl NodeBehaviour<f32, 2, FreeSpaceParams<f32, 2>, P = Self::P>,
+                NB = impl NodeBehaviour<f32, 2, FreeSpaceParams<f32, 2>, P = Self::P, E = Self::E>,
+                E = Self::E,
             >,
     >(
         mut self,
@@ -172,6 +173,7 @@ fn test_flood() {
         type NB = MonotonicFlood;
         type PM = FreeSpace;
         type S = ();
+        type E = ();
     }
 
     let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, FreeSpace);

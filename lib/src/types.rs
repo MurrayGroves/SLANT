@@ -12,12 +12,14 @@ use log::{debug, info, trace};
 use num_traits::Float;
 use num_traits::float::FloatCore;
 use rand::RngExt;
-use rand::distr::uniform::SampleUniform;
+use rand::distr::uniform::{SampleRange, SampleUniform};
+use rand::distr::{Distribution, StandardUniform};
 use rand_xoshiro::Xoshiro256Plus;
 use rand_xoshiro::rand_core::{RngCore, SeedableRng};
 use rayon::prelude::*;
 use std::cell::{Cell, RefCell, SyncUnsafeCell};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::iter::Sum;
 use std::sync::{Arc, Mutex};
 use thread_local::ThreadLocal;
@@ -27,10 +29,17 @@ where
     <Self::S as Linearize>::Storage<isize>: Send,
 {
     type MB: MoveBehaviour<A, K>;
-    type NB: NodeBehaviour<A, K, <<Self as SimConfig<A, K>>::PM as PropagationModel<A, K>>::P>;
+    type NB: NodeBehaviour<
+            A,
+            K,
+            <<Self as SimConfig<A, K>>::PM as PropagationModel<A, K>>::P,
+            E = <Self as SimConfig<A, K>>::E,
+        >;
     type PM: PropagationModel<A, K>;
     /// Key type for stored stats
     type S: Linearize;
+    /// User-defined event type
+    type E: Send + Clone = ();
 }
 
 /// Describes a node behaviour which performs some processing each tick to produce a new node behaviour
@@ -39,12 +48,17 @@ pub trait NodeBehaviour<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>
 {
     /// Packet type that this node can receive and process.
     type P: Packet<A, K> + ?Sized;
+
+    /// Type for events this node behaviour can produce
+    type E = ();
+
     fn tick<
         C: SimConfig<
                 A,
                 K,
                 PM = impl PropagationModel<A, K, P = PP>,
-                NB = impl NodeBehaviour<A, K, PP, P = Self::P>,
+                NB = impl NodeBehaviour<A, K, PP, P = Self::P, E = Self::E>,
+                E = Self::E,
             >,
     >(
         self,
@@ -124,7 +138,7 @@ impl<
         &self.move_behaviour
     }
 
-    fn tick_behaviour<PM, C: SimConfig<A, K, PM = PM, NB = NB>>(
+    fn tick_behaviour<PM, C: SimConfig<A, K, PM = PM, NB = NB, E = NB::E>>(
         self,
         global_state_manager: &GlobalStateManager<A, K, C>,
         incoming_packets: &Vec<NB::P>,
@@ -185,7 +199,7 @@ pub struct GlobalStateManager<A: Coord<K>, const K: usize, C: SimConfig<A, K>> {
     rngs: Arc<Vec<SyncUnsafeCell<Xoshiro256Plus>>>,
     propagation_model: C::PM,
     /// Thread-local stats
-    stats: Arc<ThreadLocal<RefCell<TimestepStats<C::S>>>>,
+    stats: Arc<ThreadLocal<RefCell<TimestepStats<C::S, C::E>>>>,
 }
 
 impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C> {
@@ -224,13 +238,13 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
     }
 
     /// Calling this will clear the internal stats buffer!
-    pub fn consume_stats(&mut self) -> TimestepStats<C::S> {
+    pub fn consume_stats(&mut self) -> TimestepStats<C::S, C::E> {
         let mut stats = TimestepStats::new();
         for thread in Arc::into_inner(std::mem::take(&mut self.stats))
             .unwrap()
             .into_iter()
         {
-            stats.consume(&*thread.borrow())
+            stats.consume(thread.into_inner())
         }
         debug!(
             "Consumed stats buffer has {} events",
@@ -299,7 +313,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
         packet: <C::NB as NodeBehaviour<A, K, <C::PM as PropagationModel<A, K>>::P>>::P,
     ) {
         let mut stats = self.stats.get_or_default().borrow_mut();
-        stats.add_event(PacketTransmit(transmitter.id));
+        stats.add_internal_event(PacketTransmit(transmitter.id));
         stats.inc_internal(PacketTransmits, 1);
 
         let eager_targets = packet.eager_targets();
@@ -341,7 +355,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
             transmitter.propagation_params.prune_distance()
         );
         for recipient in recipients {
-            stats.add_event(PacketLink((transmitter.id, *recipient)));
+            stats.add_internal_event(PacketLink((transmitter.id, *recipient)));
             let mutex = unsafe { self.new_packets.get(recipient).unwrap_unchecked() };
             let mut packets = mutex.lock().unwrap();
             packets.push(packet.clone());
@@ -351,14 +365,38 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
     /// `id` must be a unique ID for the behaviour accessing the method. Ensures reproducibility.
     pub fn get_random_range(&self, id: usize, min: A, max: A) -> A {
         // Assumes RNGs initialised for all initialised IDs!
-        let out = unsafe {
+        unsafe {
             let cell: *const SyncUnsafeCell<Xoshiro256Plus> = &self.rngs[id];
             let rng = SyncUnsafeCell::raw_get(cell);
             rng.as_mut().unwrap().random_range(min..max)
-        };
+        }
+    }
 
-        trace!("{} generated {:?}", id, out);
-        out
+    pub fn get_random<T>(&self, id: usize) -> T
+    where
+        StandardUniform: Distribution<T>,
+    {
+        // Assumes RNGs initialised for all initialised IDs!
+        unsafe {
+            let cell: *const SyncUnsafeCell<Xoshiro256Plus> = &self.rngs[id];
+            let rng = SyncUnsafeCell::raw_get(cell);
+            rng.as_mut().unwrap().random()
+        }
+    }
+
+    pub fn add_event(&self, event: C::E) {
+        let mut stats = self.stats.get_or_default().borrow_mut();
+        stats.add_user_event(event);
+    }
+
+    pub fn inc(&self, key: C::S, x: isize) {
+        let mut stats = self.stats.get_or_default().borrow_mut();
+        stats.inc(key, x);
+    }
+
+    pub fn dec(&self, key: C::S, x: isize) {
+        let mut stats = self.stats.get_or_default().borrow_mut();
+        stats.dec(key, x);
     }
 }
 

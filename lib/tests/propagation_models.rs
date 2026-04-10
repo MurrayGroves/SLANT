@@ -90,6 +90,7 @@ fn free_space() {
         type NB = Monotonic<f32, 2, MulticastTestPacket, FreeSpaceParams<f32, 2>>;
         type PM = FreeSpace;
         type S = ();
+        type E = ();
     }
 
     let mut sim_manager: SimManager<f32, 2, TestSimConfig> =
