@@ -46,14 +46,17 @@ impl<T: Linearize, E: Clone> TimestepStats<T, E> {
         self.user[key] -= by;
     }
 
+    #[cfg(not(feature = "disable_internal_stats"))]
     pub(crate) fn inc_internal(&mut self, key: InternalStatKey, by: isize) {
         self.internal[key] += by;
     }
 
+    #[cfg(not(feature = "disable_internal_stats"))]
     pub(crate) fn dec_internal(&mut self, key: InternalStatKey, by: isize) {
         self.internal[key] -= by;
     }
 
+    #[cfg(not(feature = "disable_internal_events"))]
     pub(crate) fn add_internal_event(&mut self, event: InternalEvent) {
         self.internal_events.push(event);
     }
@@ -62,6 +65,7 @@ impl<T: Linearize, E: Clone> TimestepStats<T, E> {
         self.user_events.push(event);
     }
     pub(crate) fn consume(&mut self, other: Self) {
+        #[cfg(not(feature = "disable_internal_stats"))]
         for (key, val) in &other.internal {
             self.internal[key] += val;
         }
@@ -70,6 +74,7 @@ impl<T: Linearize, E: Clone> TimestepStats<T, E> {
             self.user[key] += val;
         }
 
+        #[cfg(not(feature = "disable_internal_events"))]
         self.internal_events
             .extend(other.internal_events.into_iter());
 

@@ -312,8 +312,14 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
         transmitter: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
         packet: <C::NB as NodeBehaviour<A, K, <C::PM as PropagationModel<A, K>>::P>>::P,
     ) {
+        #[cfg(not(all(
+            feature = "disable_internal_stats",
+            feature = "disable_internal_events"
+        )))]
         let mut stats = self.stats.get_or_default().borrow_mut();
+        #[cfg(not(feature = "disable_internal_events"))]
         stats.add_internal_event(PacketTransmit(transmitter.id));
+        #[cfg(not(feature = "disable_internal_stats"))]
         stats.inc_internal(PacketTransmits, 1);
 
         let eager_targets = packet.eager_targets();
@@ -355,6 +361,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
             transmitter.propagation_params.prune_distance()
         );
         for recipient in recipients {
+            #[cfg(not(feature = "disable_internal_events"))]
             stats.add_internal_event(PacketLink((transmitter.id, *recipient)));
             let mutex = unsafe { self.new_packets.get(recipient).unwrap_unchecked() };
             let mut packets = mutex.lock().unwrap();
