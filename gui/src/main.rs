@@ -1,7 +1,7 @@
 mod sim;
 mod sim_canvas;
 
-use crate::Message::CanvasScroll;
+use crate::Message::{CanvasScroll, ToggleDelay};
 use crate::iced::widget::button;
 use crate::sim::{SeqPacketTransmit, SimConf, generate_nodes};
 use crate::sim_canvas::SimCanvas;
@@ -13,7 +13,7 @@ use cosmic::iced_core::id::A11yId::Widget;
 use cosmic::prelude::*;
 use cosmic::widget::{Canvas, canvas, container};
 use cosmic::{Core, iced, widget};
-use log::debug;
+use log::{debug, info};
 use manetsim::example_behaviours::RandomWalk;
 use manetsim::example_behaviours::flood::Flood;
 use manetsim::propagation_models::{
@@ -36,6 +36,7 @@ struct App {
     transmit_count: usize,
     link_count: usize,
     paused: bool,
+    delay: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +56,8 @@ enum Message {
     MouseUp,
     MouseMove(Point),
     TogglePause,
+    ToggleDelay(bool),
+    DoDelay(u64),
 }
 
 impl cosmic::Application for App {
@@ -100,6 +103,7 @@ impl cosmic::Application for App {
             link_count: 0,
             transmit_count: 0,
             paused: true,
+            delay: true,
         };
 
         let command = app.set_window_title("Manetsim".to_string(), iced::window::Id::unique());
@@ -121,6 +125,10 @@ impl cosmic::Application for App {
         let play_pause = widget::button::text(play_pause_text)
             .on_press(Message::TogglePause)
             .into();
+        let delay = widget::checkbox(self.delay)
+            .label("Delay")
+            .on_toggle(ToggleDelay)
+            .into();
         let button = widget::button::text("Tick").on_press(Message::Tick).into();
         let tick = widget::text(format!("Tick: {}", self.tick))
             .center()
@@ -134,6 +142,7 @@ impl cosmic::Application for App {
             .into();
         let status = widget::row::with_children(vec![
             play_pause,
+            delay,
             button,
             tick,
             transmit_count,
@@ -161,19 +170,24 @@ impl cosmic::Application for App {
                 self.sim_canvas.seq_transmits = x.seq_transmits;
                 self.sim_canvas.nodes = x.nodes;
                 let mut reset = self.sim_canvas.reset.lock().unwrap();
-                *reset = 2;
+                *reset = 1;
 
                 debug!("Updated sim data");
                 self.status_text = "Rendering new state".to_string();
                 if !self.paused {
-                    cosmic::task::message(Message::NewStatus("".to_string()))
-                        .chain(cosmic::task::message(Message::Tick))
+                    if (self.delay) {
+                        cosmic::task::message(Message::NewStatus("Delay".to_string()))
+                            .chain(cosmic::task::message(Message::DoDelay(200)))
+                    } else {
+                        cosmic::task::message(Message::NewStatus("".to_string()))
+                            .chain(cosmic::task::message(Message::Tick))
+                    }
                 } else {
                     cosmic::task::message(Message::NewStatus("".to_string()))
                 }
             }
             Message::Tick => {
-                if self.tick > 500 {
+                if self.tick > 1500 {
                     self.tick = 0;
 
                     let nodes = generate_nodes(4096, 3_000.0);
@@ -187,7 +201,6 @@ impl cosmic::Application for App {
                 self.status_text = "running tick".to_string();
                 cosmic::task::future(async move {
                     let result = tokio::task::spawn_blocking(async move || {
-                        sleep(Duration::from_millis(200)).await;
                         let mut sim = sim.write().await;
                         let start = Instant::now();
                         sim.n_ticks(1);
@@ -218,7 +231,7 @@ impl cosmic::Application for App {
             Message::CanvasScroll(e) => {
                 self.sim_canvas.zoom += match e {
                     ScrollDelta::Lines { x, y } => y,
-                    ScrollDelta::Pixels { x, y } => y,
+                    ScrollDelta::Pixels { x, y } => y / 500.0,
                 };
                 debug!("New zoom level: {}", self.sim_canvas.zoom);
                 *self.sim_canvas.reset.lock().unwrap() = 1;
@@ -255,6 +268,19 @@ impl cosmic::Application for App {
                     cosmic::task::none()
                 }
             }
+            Message::ToggleDelay(x) => {
+                self.delay = x;
+                cosmic::task::none()
+            }
+            Message::DoDelay(delay) => cosmic::task::future(async move {
+                tokio::task::spawn_blocking(async move || {
+                    sleep(Duration::from_millis(delay)).await;
+                })
+                .await
+                .unwrap()
+                .await;
+                Message::Tick
+            }),
         }
     }
 }
