@@ -5,7 +5,6 @@ WORKDIR /home/ij22909
 ADD src src
 ADD tests tests
 ADD Cargo.toml Cargo.toml
-ADD Cargo.lock Cargo.lock
 ADD ../rust-toolchain.toml rust-toolchain.toml
 
 RUN cargo fetch
