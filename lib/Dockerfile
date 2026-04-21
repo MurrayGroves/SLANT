@@ -13,4 +13,4 @@ ENV CARGO_TARGET_DIR=/user/home/ij22909/internal
 ENV RAYON_NUM_THREADS=1
 ENV RUST_LOG=info
 
-CMD ["cargo", "test", "--target", "host-tuple", "--release", "flood", "--", "--no-capture"]
+CMD ["cargo", "test", "--target", "host-tuple", "--release",  "--features", "disable_internal_stats,disable_internal_events", "flood", "--", "--no-capture"]
