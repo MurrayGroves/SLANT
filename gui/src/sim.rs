@@ -97,7 +97,7 @@ pub struct Monotonic<
 impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet<A, K> + Clone>
     Monotonic<A, K, P, PP>
 {
-    const CHANCE: f32 = 0.0001;
+    const CHANCE: f32 = 0.0002;
 
     pub fn new(gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>) -> Self {
         Monotonic {
@@ -333,7 +333,7 @@ pub fn generate_nodes(
             //     -90.0,
             // ),
             propagation_params: SimpleDistanceParams {
-                transmit_distance: 3700.0,
+                transmit_distance: 5000.0,
             },
         })
     }

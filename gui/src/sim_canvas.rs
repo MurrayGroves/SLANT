@@ -166,7 +166,7 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
 
                 let circle = canvas::Path::circle(position, 3.0);
                 if bounds.contains(position) {
-                    frame.fill(&circle, Color::BLACK);
+                    frame.fill(&circle, Color::from_rgba(0.0, 0.0, 0.0, 0.7));
                 }
                 node_vis.push(Node { circle, position })
             }
@@ -233,7 +233,7 @@ impl Program<Message, cosmic::Theme> for SimCanvas {
                                 let diff = src - dst;
                                 let length = (diff.x.powi(2) + diff.y.powi(2)).sqrt();
                                 let unit = (diff / length)
-                                    * 8.0
+                                    * 1.0
                                     * SimCanvas::ZOOM_EXPONENT.powf(self.zoom);
                                 let left_wing =
                                     Transform2D::<f32, f32, f32>::rotation(Angle::degrees(-8.0))
