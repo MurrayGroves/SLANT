@@ -37,7 +37,7 @@ where
         >;
     type PM: PropagationModel<A, K>;
     /// Key type for stored stats
-    type S: Linearize;
+    type S: Linearize = ();
     /// User-defined event type
     type E: Send + Clone = ();
 }
