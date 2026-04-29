@@ -270,14 +270,6 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
             )
             .collect();
 
-        let nodes: Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> = nodes
-            .into_par_iter()
-            .map(|x| {
-                let packets = self.incoming_packets.get(&x.data.id).unwrap();
-                x.tick_behaviour(&self, packets)
-            })
-            .collect();
-
         let tree = ImmutableKdTree::new_from_slice(
             nodes
                 .iter()
@@ -285,6 +277,14 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
                 .collect::<Vec<_>>()
                 .as_slice(),
         );
+
+        let nodes: Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> = nodes
+            .into_par_iter()
+            .map(|x| {
+                let packets = self.incoming_packets.get(&x.data.id).unwrap();
+                x.tick_behaviour(&self, packets)
+            })
+            .collect();
 
         // The only time we have other Arcs is during ticking
         let new_packets = Arc::into_inner(self.new_packets).unwrap();
