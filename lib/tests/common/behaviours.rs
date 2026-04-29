@@ -10,12 +10,7 @@ use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
-pub struct Monotonic<
-    A: Coord<K>,
-    const K: usize,
-    P: Packet<A, K> + Clone,
-    PP: PropagationParams<A, K>,
-> {
+pub struct Monotonic<A: Coord<K>, const K: usize, P: Packet + Clone, PP: PropagationParams<A, K>> {
     packet_type: PhantomData<P>,
     pub ticks_per_packet: usize,
     counter: usize,
@@ -23,7 +18,7 @@ pub struct Monotonic<
     gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
 }
 
-impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet<A, K> + Clone>
+impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet + Clone>
     Monotonic<A, K, P, PP>
 {
     pub fn new(
@@ -40,7 +35,7 @@ impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet<A, K> +
     }
 }
 
-impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet<A, K> + Clone>
+impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet + Clone>
     NodeBehaviour<A, K, PP> for Monotonic<A, K, P, PP>
 {
     type P = P;

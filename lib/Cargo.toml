@@ -20,9 +20,14 @@ linearize = { version = "*", features = ["derive"] }
 thread_local = "1.1.9"
 az = "1.3.0"
 take_mut = "0.2.2"
+enum_dispatch = "*"
 
 [features]
 # Disables internal stat collection
 disable_internal_stats = []
 # Disables internal event collection
 disable_internal_events = []
+
+[[example]]
+path = "examples/flood.rs"
+name = "flood"

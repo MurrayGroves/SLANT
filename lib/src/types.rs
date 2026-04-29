@@ -47,7 +47,7 @@ pub trait NodeBehaviour<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>
     Sized + Send + Sync + Clone
 {
     /// Packet type that this node can receive and process.
-    type P: Packet<A, K> + ?Sized;
+    type P: Packet + ?Sized;
 
     /// Type for events this node behaviour can produce
     type E = ();

@@ -3,7 +3,7 @@ mod common;
 use common::behaviours::{Monotonic, StaticMovement};
 use manetsim::packets::{MulticastPacket, Packet};
 use manetsim::propagation_models::{FreeSpace, FreeSpaceParams, PropagationParams};
-use manetsim::types::{NodeData, NodeID, NodeInit, SimConfig, SimManager};
+use manetsim::types::{Coord, NodeData, NodeID, NodeInit, SimConfig, SimManager};
 use std::sync::Arc;
 
 #[test]
@@ -63,7 +63,7 @@ fn free_space() {
         content: Box<[u8]>,
     };
 
-    impl Packet<f32, 2> for MulticastTestPacket {
+    impl Packet for MulticastTestPacket {
         fn content(self) -> Box<[u8]> {
             self.content
         }
@@ -76,7 +76,10 @@ fn free_space() {
             None
         }
 
-        fn targets<P: PropagationParams<f32, 2>>(&self, target: &NodeData<f32, 2, P>) -> bool
+        fn targets<A: Coord<K>, const K: usize, P: PropagationParams<A, K>>(
+            &self,
+            target: &NodeData<A, K, P>,
+        ) -> bool
         where
             Self: Sized,
         {

@@ -1,5 +1,6 @@
 use crate::propagation_models::PropagationParams;
 use crate::types::{Coord, NodeData, NodeID};
+use enum_dispatch::enum_dispatch;
 use num_traits::Num;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
@@ -11,7 +12,7 @@ pub struct UnicastPacket {
     pub content: Box<[u8]>,
 }
 
-impl<A: Coord<K>, const K: usize> Packet<A, K> for UnicastPacket {
+impl Packet for UnicastPacket {
     fn content(self) -> Box<[u8]> {
         self.content
     }
@@ -24,7 +25,10 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for UnicastPacket {
         Some(vec![self.target])
     }
 
-    fn targets<P: PropagationParams<A, K>>(&self, target: &NodeData<A, K, P>) -> bool {
+    fn targets<A: Coord<K>, const K: usize, P: PropagationParams<A, K>>(
+        &self,
+        target: &NodeData<A, K, P>,
+    ) -> bool {
         target.id == self.target
     }
 }
@@ -40,7 +44,7 @@ pub struct MulticastPacket {
     pub content: Box<[u8]>,
 }
 
-impl<A: Coord<K>, const K: usize> Packet<A, K> for MulticastPacket {
+impl Packet for MulticastPacket {
     fn content(self) -> Box<[u8]> {
         self.content
     }
@@ -53,7 +57,10 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for MulticastPacket {
         None
     }
 
-    fn targets<P: PropagationParams<A, K>>(&self, target: &NodeData<A, K, P>) -> bool {
+    fn targets<A: Coord<K>, const K: usize, P: PropagationParams<A, K>>(
+        &self,
+        target: &NodeData<A, K, P>,
+    ) -> bool {
         true
     }
 }
@@ -64,7 +71,8 @@ impl Debug for MulticastPacket {
     }
 }
 
-pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync + Clone {
+#[enum_dispatch]
+pub trait Packet: Debug + Send + Sync + Clone {
     fn content(self) -> Box<[u8]>;
 
     fn content_ref(&self) -> &Box<[u8]>;
@@ -75,7 +83,10 @@ pub trait Packet<A: Coord<K>, const K: usize>: Debug + Send + Sync + Clone {
     fn eager_targets(&self) -> Option<Vec<NodeID>>;
 
     /// Whether a packet should be received by a given node
-    fn targets<P: PropagationParams<A, K>>(&self, target: &NodeData<A, K, P>) -> bool
+    fn targets<A: Coord<K>, const K: usize, P: PropagationParams<A, K>>(
+        &self,
+        target: &NodeData<A, K, P>,
+    ) -> bool
     where
         Self: Sized;
 }
@@ -86,61 +97,58 @@ pub enum MulticastOrUnicast {
     UnicastPacket(UnicastPacket),
 }
 
-impl<A: Coord<K>, const K: usize> Packet<A, K> for MulticastOrUnicast {
+impl Packet for MulticastOrUnicast {
     fn content(self) -> Box<[u8]> {
         match self {
-            MulticastOrUnicast::UnicastPacket(pck) => <UnicastPacket as Packet<A, K>>::content(pck),
-            MulticastOrUnicast::MulticastPacket(pck) => {
-                <MulticastPacket as Packet<A, K>>::content(pck)
-            }
+            MulticastOrUnicast::UnicastPacket(pck) => UnicastPacket::content(pck),
+            MulticastOrUnicast::MulticastPacket(pck) => <MulticastPacket as Packet>::content(pck),
         }
     }
 
     fn content_ref(&self) -> &Box<[u8]> {
         match self {
-            MulticastOrUnicast::UnicastPacket(pck) => {
-                <UnicastPacket as Packet<A, K>>::content_ref(pck)
-            }
+            MulticastOrUnicast::UnicastPacket(pck) => <UnicastPacket as Packet>::content_ref(pck),
             MulticastOrUnicast::MulticastPacket(pck) => {
-                <MulticastPacket as Packet<A, K>>::content_ref(pck)
+                <MulticastPacket as Packet>::content_ref(pck)
             }
         }
     }
 
     fn eager_targets(&self) -> Option<Vec<NodeID>> {
         match self {
-            MulticastOrUnicast::UnicastPacket(pck) => {
-                <UnicastPacket as Packet<A, K>>::eager_targets(pck)
-            }
+            MulticastOrUnicast::UnicastPacket(pck) => <UnicastPacket as Packet>::eager_targets(pck),
             MulticastOrUnicast::MulticastPacket(pck) => {
-                <MulticastPacket as Packet<A, K>>::eager_targets(pck)
+                <MulticastPacket as Packet>::eager_targets(pck)
             }
         }
     }
 
-    fn targets<P: PropagationParams<A, K>>(&self, target: &NodeData<A, K, P>) -> bool
+    fn targets<A: Coord<K>, const K: usize, P: PropagationParams<A, K>>(
+        &self,
+        target: &NodeData<A, K, P>,
+    ) -> bool
     where
         Self: Sized,
     {
         match self {
             MulticastOrUnicast::UnicastPacket(pck) => {
-                <UnicastPacket as Packet<A, K>>::targets(pck, target)
+                <UnicastPacket as Packet>::targets(pck, target)
             }
             MulticastOrUnicast::MulticastPacket(pck) => {
-                <MulticastPacket as Packet<A, K>>::targets(pck, target)
+                <MulticastPacket as Packet>::targets(pck, target)
             }
         }
     }
 }
 
 /// A packet that can provide the ID of the node which originated it
-pub trait OriginatedPacket<A: Coord<K>, const K: usize>: Packet<A, K> {
+pub trait OriginatedPacket: Packet {
     /// Get ID of node which originated this packet
     fn get_origin(&self) -> NodeID;
 }
 
 /// A packet that can provide a sequence number uniquely identifying this packet w.r.t its originator
-pub trait LocallySequencedPacket<A: Coord<K>, const K: usize>: OriginatedPacket<A, K> {
+pub trait LocallySequencedPacket: OriginatedPacket {
     type S: Num + Send + Sync + Clone + Eq + Hash;
     fn seq(&self) -> Self::S;
 }
@@ -148,7 +156,7 @@ pub trait LocallySequencedPacket<A: Coord<K>, const K: usize>: OriginatedPacket<
 /// A packet that can provide a sequence number uniquely identifying this packet globally.
 /// If your packet implements [LocallySequencedPacket], you should probably just implement
 /// this as a concatenation of the originator and the local sequence number.
-pub trait GloballySequencedPacket<A: Coord<K>, const K: usize>: Packet<A, K> {
+pub trait GloballySequencedPacket: Packet {
     /// Type for sequence number
     type S: Num + Send + Sync + Copy + Eq + Hash + AddAssign + Debug;
     fn seq(&self) -> Self::S;

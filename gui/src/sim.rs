@@ -23,7 +23,7 @@ pub struct TestPacket {
     content: Box<[u8]>,
 }
 
-impl<A: Coord<K>, const K: usize> Packet<A, K> for TestPacket {
+impl Packet for TestPacket {
     fn content(self) -> Box<[u8]> {
         self.content
     }
@@ -36,7 +36,10 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for TestPacket {
         None
     }
 
-    fn targets<P: PropagationParams<A, K>>(&self, target: &NodeData<A, K, P>) -> bool
+    fn targets<A: Coord<K>, const K: usize, P: PropagationParams<A, K>>(
+        &self,
+        target: &NodeData<A, K, P>,
+    ) -> bool
     where
         Self: Sized,
     {
@@ -44,7 +47,7 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for TestPacket {
     }
 }
 
-impl<A: Coord<K>, const K: usize> GloballySequencedPacket<A, K> for TestPacket {
+impl GloballySequencedPacket for TestPacket {
     type S = u16;
 
     fn seq(&self) -> Self::S {
@@ -57,18 +60,18 @@ impl<A: Coord<K>, const K: usize> GloballySequencedPacket<A, K> for TestPacket {
     }
 }
 
-impl<A: Coord<K>, const K: usize> FloodPacket<A, K> for TestPacket {
+impl FloodPacket for TestPacket {
     type H = u8;
 
-    fn get_hop_count(&self) -> <Self as FloodPacket<A, K>>::H {
+    fn get_hop_count(&self) -> <Self as FloodPacket>::H {
         self.hops
     }
 
-    fn set_hop_count(&mut self, count: <Self as FloodPacket<A, K>>::H) {
+    fn set_hop_count(&mut self, count: <Self as FloodPacket>::H) {
         self.hops = count;
     }
 
-    fn new(
+    fn new<A: Coord<K>, const K: usize>(
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
         hops: Self::H,
         seq: Self::S,
@@ -84,17 +87,12 @@ impl<A: Coord<K>, const K: usize> FloodPacket<A, K> for TestPacket {
 }
 
 #[derive(Clone)]
-pub struct Monotonic<
-    A: Coord<K>,
-    const K: usize,
-    P: Packet<A, K> + Clone,
-    PP: PropagationParams<A, K>,
-> {
+pub struct Monotonic<A: Coord<K>, const K: usize, P: Packet + Clone, PP: PropagationParams<A, K>> {
     packet_type: PhantomData<P>,
     gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
 }
 
-impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet<A, K> + Clone>
+impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet + Clone>
     Monotonic<A, K, P, PP>
 {
     const CHANCE: f32 = 0.0002;
@@ -107,15 +105,11 @@ impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet<A, K> +
     }
 }
 
-impl<
-    A: Coord<K>,
-    const K: usize,
-    PP: PropagationParams<A, K>,
-    P: GloballySequencedPacket<A, K> + Clone,
-> NodeBehaviour<A, K, PP> for Monotonic<A, K, P, PP>
+impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: GloballySequencedPacket + Clone>
+    NodeBehaviour<A, K, PP> for Monotonic<A, K, P, PP>
 {
     type P = P;
-    type E = SeqPacketTransmit<<P as GloballySequencedPacket<A, K>>::S>;
+    type E = SeqPacketTransmit<<P as GloballySequencedPacket>::S>;
 
     fn tick<
         C: SimConfig<
@@ -150,7 +144,7 @@ impl<
     }
 }
 #[derive(Clone)]
-pub struct Flood<PT: FloodPacket<A, K> + Clone + ?Sized, A: Coord<K>, const K: usize> {
+pub struct Flood<PT: FloodPacket + Clone + ?Sized, A: Coord<K>, const K: usize> {
     seen_packets: Arc<Mutex<HashSet<PT::S>>>,
     coord_type: PhantomData<A>,
     /// Seq of most recent packet generated
@@ -159,16 +153,14 @@ pub struct Flood<PT: FloodPacket<A, K> + Clone + ?Sized, A: Coord<K>, const K: u
     hop_count: usize,
 }
 
-pub trait FloodPacket<A: Coord<K>, const K: usize>:
-    Packet<A, K> + GloballySequencedPacket<A, K> + Clone
-{
+pub trait FloodPacket: Packet + GloballySequencedPacket + Clone {
     /// Type of hop count
     type H: Num + NumCast + PartialOrd + Zero;
-    fn get_hop_count(&self) -> <Self as FloodPacket<A, K>>::H;
+    fn get_hop_count(&self) -> <Self as FloodPacket>::H;
 
-    fn set_hop_count(&mut self, count: <Self as FloodPacket<A, K>>::H);
+    fn set_hop_count(&mut self, count: <Self as FloodPacket>::H);
 
-    fn new(
+    fn new<A: Coord<K>, const K: usize>(
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
         hops: Self::H,
         seq: Self::S,
@@ -185,7 +177,7 @@ impl<
 > NodeBehaviour<A, K, PP> for Flood<PT, A, K>
 where
     A: Coord<K>,
-    PT: FloodPacket<A, K, H = H>,
+    PT: FloodPacket<H = H>,
 {
     type P = PT;
     type E = SeqPacketTransmit<PT::S>;
@@ -208,10 +200,10 @@ where
         for packet in incoming_packets {
             // If packet hasn't been relayed before, and remaining hop count is greater than zero, retransmit
             if !seen_packets.contains(&packet.seq())
-                && packet.get_hop_count() > <PT as FloodPacket<A, K>>::H::zero()
+                && packet.get_hop_count() > <PT as FloodPacket>::H::zero()
             {
                 let mut packet = packet.clone();
-                packet.set_hop_count(packet.get_hop_count() - <PT as FloodPacket<A, K>>::H::one());
+                packet.set_hop_count(packet.get_hop_count() - <PT as FloodPacket>::H::one());
                 seen_packets.insert(packet.seq());
                 trace!(
                     "{:?}: transmitting packet {:?} with {:?} hops left",
@@ -233,7 +225,7 @@ where
     }
 }
 
-impl<PT: FloodPacket<A, K> + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
+impl<PT: FloodPacket + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
     pub fn new(hops: usize) -> Self {
         Self {
             seen_packets: Arc::new(Mutex::new(HashSet::new())),
@@ -251,7 +243,7 @@ impl<PT: FloodPacket<A, K> + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K>
         let mut seq = self.seq.lock().unwrap();
         let packet = PT::new(
             data,
-            <<PT as FloodPacket<A, K>>::H as NumCast>::from(self.hop_count).unwrap(),
+            <<PT as FloodPacket>::H as NumCast>::from(self.hop_count).unwrap(),
             *seq,
             content,
         );
@@ -260,7 +252,7 @@ impl<PT: FloodPacket<A, K> + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K>
     }
 }
 
-impl<PT: FloodPacket<A, K> + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
+impl<PT: FloodPacket + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
     pub fn seq(&self) -> PT::S {
         *self.seq.lock().unwrap()
     }
@@ -274,7 +266,7 @@ pub struct MonotonicFlood {
 
 impl NodeBehaviour<f32, 2, SimpleDistanceParams<f32, 2>> for MonotonicFlood {
     type P = TestPacket;
-    type E = SeqPacketTransmit<<Self::P as GloballySequencedPacket<f32, 2>>::S>;
+    type E = SeqPacketTransmit<<Self::P as GloballySequencedPacket>::S>;
     fn tick<
         C: SimConfig<
                 f32,
@@ -352,5 +344,5 @@ impl SimConfig<f32, 2> for SimConf {
     type NB = MonotonicFlood;
     type PM = SimpleDistance;
     type S = ();
-    type E = SeqPacketTransmit<<TestPacket as GloballySequencedPacket<f32, 2>>::S>;
+    type E = SeqPacketTransmit<<TestPacket as GloballySequencedPacket>::S>;
 }

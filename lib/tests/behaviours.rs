@@ -28,7 +28,7 @@ struct TestPacket {
     content: Box<[u8]>,
 }
 
-impl<A: Coord<K>, const K: usize> Packet<A, K> for TestPacket {
+impl Packet for TestPacket {
     fn content(self) -> Box<[u8]> {
         self.content
     }
@@ -41,7 +41,10 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for TestPacket {
         None
     }
 
-    fn targets<P: PropagationParams<A, K>>(&self, target: &NodeData<A, K, P>) -> bool
+    fn targets<A: Coord<K>, const K: usize, P: PropagationParams<A, K>>(
+        &self,
+        target: &NodeData<A, K, P>,
+    ) -> bool
     where
         Self: Sized,
     {
@@ -49,7 +52,7 @@ impl<A: Coord<K>, const K: usize> Packet<A, K> for TestPacket {
     }
 }
 
-impl<A: Coord<K>, const K: usize> GloballySequencedPacket<A, K> for TestPacket {
+impl GloballySequencedPacket for TestPacket {
     type S = u16;
 
     fn seq(&self) -> Self::S {
@@ -62,18 +65,18 @@ impl<A: Coord<K>, const K: usize> GloballySequencedPacket<A, K> for TestPacket {
     }
 }
 
-impl<A: Coord<K>, const K: usize> FloodPacket<A, K> for TestPacket {
+impl FloodPacket for TestPacket {
     type H = u8;
 
-    fn get_hop_count(&self) -> <Self as FloodPacket<A, K>>::H {
+    fn get_hop_count(&self) -> <Self as FloodPacket>::H {
         self.hops
     }
 
-    fn set_hop_count(&mut self, count: <Self as FloodPacket<A, K>>::H) {
+    fn set_hop_count(&mut self, count: <Self as FloodPacket>::H) {
         self.hops = count;
     }
 
-    fn new(
+    fn new<A: Coord<K>, const K: usize>(
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
         hops: Self::H,
         seq: Self::S,
@@ -158,7 +161,7 @@ fn generate_nodes<MB: MoveBehaviour<f32, 2>, P: PropagationParams<f32, 2>>(
 
 #[test]
 fn test_flood() {
-    env_logger::init();
+    //env_logger::init();
 
     let num_nodes = env::var("NUM_NODES")
         .unwrap_or("1024".into())
@@ -212,7 +215,7 @@ fn test_flood() {
 
 #[test]
 fn random_walk_scale_test() {
-    env_logger::init();
+    //env_logger::init();
 
     let num_nodes = env::var("NUM_NODES")
         .unwrap_or("1024".into())
