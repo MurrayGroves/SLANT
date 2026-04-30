@@ -2,6 +2,7 @@ use crate::types::{Coord, MoveBehaviour, NodeBehaviour, NodeData};
 use log::trace;
 use std::f32::consts::PI;
 
+/// A propagation model is responsible for determining what nodes receive a transmitted packet.
 pub trait PropagationModel<A: Coord<K>, const K: usize>: Clone + Sized + Send + Sync {
     /// Returns true if a signal sent by sender is received by the receiver
     fn signal_received(
@@ -9,21 +10,26 @@ pub trait PropagationModel<A: Coord<K>, const K: usize>: Clone + Sized + Send + 
         sender: &NodeData<A, K, Self::P>,
         receiver: &NodeData<A, K, Self::P>,
     ) -> bool;
+
     /// Type used as propagation parameters for each node (e.g. transmit power, directionality).
     type P: PropagationParams<A, K>;
 }
 
+/// An instance of parameters for a propagation model - each node gets its own parameters that it can modify.
 pub trait PropagationParams<A: Coord<K>, const K: usize>: Clone + Sized + Send + Sync {
     /// Must return the maximum possible distance at which a transmission from this node could be heard.
     /// Used internally to prune node lookups by distance.
     fn prune_distance(&self) -> A;
 }
 
+/// A simple propagation model which only accepts packets within a radius specified in [SimpleDistanceParams]
 #[derive(Clone, Copy)]
 pub struct SimpleDistance;
 
+/// Parameters for [SimpleDistance]
 #[derive(Clone, Debug)]
 pub struct SimpleDistanceParams<A: Coord<K>, const K: usize> {
+    /// The distance this node can transmit packets
     pub transmit_distance: A,
 }
 
@@ -52,6 +58,7 @@ impl<A: Coord<K>, const K: usize> PropagationModel<A, K> for SimpleDistance {
     type P = SimpleDistanceParams<A, K>;
 }
 
+/// A propagation model which implements the Friis transmission equation to determine whether a packet is received based on [FreeSpaceParams].
 #[derive(Clone)]
 pub struct FreeSpace;
 
@@ -103,9 +110,12 @@ impl<A: Coord<K>, const K: usize> PropagationModel<A, K> for FreeSpace {
     type P = FreeSpaceParams<A, K>;
 }
 
+/// Parameters for [FreeSpace]
 #[derive(Clone, Debug)]
 pub struct FreeSpaceParams<A: Coord<K>, const K: usize> {
+    /// Transmit power in dB
     pub transmit_power: A,
+    /// Wavelength in the same unit as [A]
     pub wave_length: A,
     /// Function which returns the transmit gain for this transmitter given the current node data and direction vector
     pub transmit_gain: fn(&NodeData<A, K, Self>, [A; K]) -> A,
@@ -113,7 +123,8 @@ pub struct FreeSpaceParams<A: Coord<K>, const K: usize> {
     pub receive_gain: fn(&NodeData<A, K, Self>, [A; K]) -> A,
     /// Minimum detectable signal when this node is receiving (in dBm)
     pub mds: A,
-    pub max_theoretical_range: A,
+    /// Calculated from parameters and an ideal receiver.
+    max_theoretical_range: A,
 }
 
 impl<A: Coord<K>, const K: usize> FreeSpaceParams<A, K> {

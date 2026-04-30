@@ -3,6 +3,7 @@ use crate::propagation_models::{PropagationModel, PropagationParams};
 use crate::types::{Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeID, SimConfig};
 use rand::RngExt;
 
+/// Generates a certain number of [UnicastPacket]s and a certain number of [MulticastPacket]s and transmits them from random nodes in the network.
 pub fn mixed_multicast_and_random_target_unicast<
     A: Coord<K>,
     const K: usize,
