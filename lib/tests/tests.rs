@@ -1,22 +1,16 @@
 mod common;
 
-use lazy_static::lazy_static;
 use log::trace;
-use manetsim::example_behaviours::RandomWalk;
-use manetsim::propagation_models::{
-    FreeSpaceParams, PropagationModel, PropagationParams, SimpleDistance, SimpleDistanceParams,
-};
+use manetsim::builtin::move_behaviours::random_walk::RandomWalk;
 use manetsim::traffic_generators::mixed_multicast_and_random_target_unicast;
-use manetsim::types::{
-    Coord, GlobalStateManager, MoveBehaviour, Node, NodeBehaviour, NodeData, NodeInit, SimConfig,
-    SimManager,
-};
+use manetsim::types::{NodeInit, SimConfig, SimManager};
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
-use std::sync::{Arc, Mutex};
 
-use crate::common::behaviours::StaticMovement;
 use common::behaviours::{LoggerNode, packet_counter};
+use manetsim::builtin::propagation_models::simple_distance::{
+    SimpleDistance, SimpleDistanceParams,
+};
 
 #[test]
 fn ten_ticks_random_walk() {

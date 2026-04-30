@@ -5,7 +5,7 @@ extern crate core;
 
 pub mod types;
 
-pub mod example_behaviours;
+pub mod builtin;
 pub mod packets;
 pub mod propagation_models;
 pub mod stats;

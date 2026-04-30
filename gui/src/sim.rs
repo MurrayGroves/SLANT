@@ -1,10 +1,10 @@
 use log::trace;
-use manetsim::example_behaviours::RandomWalk;
-use manetsim::packets::{GloballySequencedPacket, Packet};
-use manetsim::propagation_models::{
-    FreeSpace, FreeSpaceParams, PropagationModel, PropagationParams, SimpleDistance,
-    SimpleDistanceParams,
+use manetsim::builtin::move_behaviours::random_walk::RandomWalk;
+use manetsim::builtin::propagation_models::simple_distance::{
+    SimpleDistance, SimpleDistanceParams,
 };
+use manetsim::packets::{GloballySequencedPacket, Packet};
+use manetsim::propagation_models::{PropagationModel, PropagationParams};
 use manetsim::types::{
     Coord, GlobalStateManager, NodeBehaviour, NodeData, NodeID, NodeInit, SimConfig,
 };

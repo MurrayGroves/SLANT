@@ -14,10 +14,10 @@ use cosmic::prelude::*;
 use cosmic::widget::{Canvas, canvas, container};
 use cosmic::{Core, iced, widget};
 use log::{debug, info};
-use manetsim::example_behaviours::RandomWalk;
-use manetsim::example_behaviours::flood::Flood;
-use manetsim::propagation_models::{
-    FreeSpace, FreeSpaceParams, SimpleDistance, SimpleDistanceParams,
+use manetsim::builtin::move_behaviours::random_walk::RandomWalk;
+use manetsim::builtin::node_behaviours::flood::Flood;
+use manetsim::builtin::propagation_models::simple_distance::{
+    SimpleDistance, SimpleDistanceParams,
 };
 use manetsim::stats::InternalEvent;
 use manetsim::types::{NodeData, SimConfig, SimManager};

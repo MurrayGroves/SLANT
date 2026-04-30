@@ -1,11 +1,11 @@
 use lazy_static::lazy_static;
 use log::trace;
-use manetsim::packets::{MulticastOrUnicast, MulticastPacket, Packet};
+use manetsim::builtin::packets::multicast_or_unicast::MulticastOrUnicast;
+use manetsim::packets::Packet;
 use manetsim::propagation_models::{PropagationModel, PropagationParams};
 use manetsim::types::{
     Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, SimConfig,
 };
-use num_traits::ToPrimitive;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 

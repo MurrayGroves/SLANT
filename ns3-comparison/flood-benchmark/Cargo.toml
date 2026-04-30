@@ -1,0 +1,11 @@
+[package]
+name = "flood-benchmark"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+manetsim = { path = "../../lib" }
+num-traits = "0.2.19"
+az = "1.3.0"
+env_logger = "*"
+log = "0.4.29"

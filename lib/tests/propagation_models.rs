@@ -1,8 +1,9 @@
 mod common;
 
 use common::behaviours::{Monotonic, StaticMovement};
-use manetsim::packets::{MulticastPacket, Packet};
-use manetsim::propagation_models::{FreeSpace, FreeSpaceParams, PropagationParams};
+use manetsim::builtin::propagation_models::free_space::{FreeSpace, FreeSpaceParams};
+use manetsim::packets::Packet;
+use manetsim::propagation_models::PropagationParams;
 use manetsim::types::{Coord, NodeData, NodeID, NodeInit, SimConfig, SimManager};
 use std::sync::Arc;
 

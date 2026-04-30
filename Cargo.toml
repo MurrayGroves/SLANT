@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["lib", "gui"]
+members = ["lib", "gui", "ns3-comparison/flood-benchmark"]
 
 [profile.release-with-debug]
 inherits = "release"

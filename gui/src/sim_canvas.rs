@@ -1,22 +1,18 @@
 use crate::Message;
 use crate::sim::SeqPacketTransmit;
 use cosmic::iced::mouse::Cursor;
-use cosmic::iced::theme::Style;
-use cosmic::iced::{Color, Point, Rectangle, Renderer, Theme, Vector};
-use cosmic::iced_renderer::geometry::frame::Backend;
+use cosmic::iced::{Color, Point, Rectangle, Renderer, Vector};
 use cosmic::iced_widget::canvas::Geometry;
 use cosmic::widget::canvas;
+use cosmic::widget::canvas::path::lyon_path::geom::Angle;
 use cosmic::widget::canvas::path::lyon_path::geom::euclid::{Transform2D, Vector2D};
-use cosmic::widget::canvas::path::lyon_path::geom::{Angle, Transform, euclid};
 use cosmic::widget::canvas::{Cache, Frame, Program, Stroke};
-use cosmic::{iced, iced_core};
 use log::debug;
-use manetsim::propagation_models::{FreeSpaceParams, SimpleDistanceParams};
+use manetsim::builtin::propagation_models::simple_distance::SimpleDistanceParams;
 use manetsim::stats::InternalEvent;
 use manetsim::stats::InternalEvent::PacketLink;
 use manetsim::types::NodeData;
 use num_traits::float::Float;
-use std::cmp::min;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 

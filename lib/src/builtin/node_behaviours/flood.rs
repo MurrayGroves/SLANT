@@ -1,21 +1,18 @@
-use crate::packets::{GloballySequencedPacket, MulticastOrUnicast, Packet};
+use crate::packets::{GloballySequencedPacket, Packet};
 use crate::propagation_models::{PropagationModel, PropagationParams};
-use crate::types::{Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, SimConfig};
-use lazy_static::lazy_static;
+use crate::types::{Coord, GlobalStateManager, NodeBehaviour, NodeData, SimConfig};
 use log::trace;
 use num_traits::{Num, NumCast, One, Zero};
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::ops::AddAssign;
-use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 pub struct Flood<PT: FloodPacket + Clone + ?Sized, A: Coord<K>, const K: usize> {
-    seen_packets: Arc<Mutex<HashSet<PT::S>>>,
+    seen_packets: HashSet<PT::S>,
     coord_type: PhantomData<A>,
     /// Seq of most recent packet generated
-    seq: Arc<Mutex<PT::S>>,
+    seq: PT::S,
     /// Hop count for new packets
     hop_count: usize,
 }
@@ -61,15 +58,14 @@ where
         global_state_manager: &GlobalStateManager<A, K, C>,
         incoming_packets: &Vec<Self::P>,
     ) -> Self {
-        let mut seen_packets = self.seen_packets.lock().unwrap();
         for packet in incoming_packets {
             // If packet hasn't been relayed before, and remaining hop count is greater than zero, retransmit
-            if !seen_packets.contains(&packet.seq())
+            if !self.seen_packets.contains(&packet.seq())
                 && packet.get_hop_count() > <PT as FloodPacket>::H::zero()
             {
                 let mut packet = packet.clone();
                 packet.set_hop_count(packet.get_hop_count() - <PT as FloodPacket>::H::one());
-                seen_packets.insert(packet.seq());
+                self.seen_packets.insert(packet.seq());
                 trace!(
                     "{:?}: transmitting packet {:?} with {:?} hops left",
                     node_data.id,
@@ -81,7 +77,6 @@ where
                 trace!("{:?} has already seen {:?}", node_data.id, packet.seq());
             }
         }
-        drop(seen_packets);
         self
     }
 }
@@ -89,32 +84,31 @@ where
 impl<PT: FloodPacket + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
     pub fn new(hops: usize) -> Self {
         Self {
-            seen_packets: Arc::new(Mutex::new(HashSet::new())),
+            seen_packets: HashSet::new(),
             coord_type: PhantomData,
-            seq: Arc::new(Mutex::new(PT::S::zero())),
+            seq: PT::S::zero(),
             hop_count: hops,
         }
     }
 
     pub fn gen_packet(
-        &self,
+        &mut self,
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
         content: Box<[u8]>,
     ) -> PT {
-        let mut seq = self.seq.lock().unwrap();
         let packet = PT::new(
             data,
             <<PT as FloodPacket>::H as NumCast>::from(self.hop_count).unwrap(),
-            *seq,
+            self.seq,
             content,
         );
-        *seq += PT::S::one();
+        self.seq += PT::S::one();
         packet
     }
 }
 
 impl<PT: FloodPacket + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
     pub fn seq(&self) -> PT::S {
-        *self.seq.lock().unwrap()
+        self.seq
     }
 }

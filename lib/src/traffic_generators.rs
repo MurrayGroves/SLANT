@@ -1,6 +1,8 @@
-use crate::packets::{MulticastOrUnicast, MulticastPacket, Packet, UnicastPacket};
-use crate::propagation_models::{PropagationModel, PropagationParams};
-use crate::types::{Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeID, SimConfig};
+use crate::builtin::packets::multicast::MulticastPacket;
+use crate::builtin::packets::multicast_or_unicast::MulticastOrUnicast;
+use crate::builtin::packets::unicast::UnicastPacket;
+use crate::propagation_models::PropagationModel;
+use crate::types::{Coord, GlobalStateManager, NodeBehaviour, NodeID, SimConfig};
 use rand::RngExt;
 
 /// Generates a certain number of [UnicastPacket]s and a certain number of [MulticastPacket]s and transmits them from random nodes in the network.
