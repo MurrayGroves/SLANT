@@ -2,12 +2,11 @@ use log::info;
 use manetsim::builtin::move_behaviours::static_movement::StaticMovement;
 use manetsim::builtin::node_behaviours::monotonic::Monotonic;
 use manetsim::builtin::propagation_models::free_space::{FreeSpace, FreeSpaceParams};
+use manetsim::managers::{GlobalStateManager, SimManager};
+use manetsim::node::{NodeData, NodeID, NodeInit};
 use manetsim::packets::{GloballySequencedPacket, Packet};
 use manetsim::propagation_models::{PropagationModel, PropagationParams};
-use manetsim::types::{
-    Coord, GlobalStateManager, MoveBehaviour, NodeBehaviour, NodeData, NodeID, NodeInit, SimConfig,
-    SimManager,
-};
+use manetsim::traits::{Coord, MoveBehaviour, NodeBehaviour, SimConfig};
 use std::collections::HashSet;
 use std::env;
 use std::fmt::Debug;

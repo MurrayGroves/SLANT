@@ -1,6 +1,7 @@
+use crate::node::{NodeData, NodeID};
 use crate::packets::Packet;
 use crate::propagation_models::PropagationParams;
-use crate::types::{Coord, NodeData, NodeID};
+use crate::traits::Coord;
 use std::fmt::{Debug, Formatter};
 
 /// A packet which can be received by any node

@@ -9,9 +9,9 @@ use cosmic::widget::canvas::path::lyon_path::geom::euclid::{Transform2D, Vector2
 use cosmic::widget::canvas::{Cache, Frame, Program, Stroke};
 use log::debug;
 use manetsim::builtin::propagation_models::simple_distance::SimpleDistanceParams;
+use manetsim::node::NodeData;
 use manetsim::stats::InternalEvent;
 use manetsim::stats::InternalEvent::PacketLink;
-use manetsim::types::NodeData;
 use num_traits::float::Float;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;

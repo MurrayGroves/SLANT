@@ -1,5 +1,7 @@
+use crate::managers::GlobalStateManager;
+use crate::node::NodeData;
 use crate::propagation_models::PropagationModel;
-use crate::types::{Coord, GlobalStateManager, MoveBehaviour, NodeData, SimConfig};
+use crate::traits::{Coord, MoveBehaviour, SimConfig};
 
 #[derive(Clone)]
 pub struct StaticMovement {}

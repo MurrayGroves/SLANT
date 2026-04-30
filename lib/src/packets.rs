@@ -1,5 +1,6 @@
+use crate::node::{NodeData, NodeID};
 use crate::propagation_models::PropagationParams;
-use crate::types::{Coord, NodeData, NodeID};
+use crate::traits::Coord;
 use num_traits::Num;
 use std::fmt::Debug;
 use std::hash::Hash;

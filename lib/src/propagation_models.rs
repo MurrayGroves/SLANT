@@ -1,4 +1,5 @@
-use crate::types::{Coord, NodeData};
+use crate::node::NodeData;
+use crate::traits::Coord;
 
 /// A propagation model is responsible for determining what nodes receive a transmitted packet.
 pub trait PropagationModel<A: Coord<K>, const K: usize>: Clone + Sized + Send + Sync {

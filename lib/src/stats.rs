@@ -1,4 +1,4 @@
-use crate::types::NodeID;
+use crate::node::NodeID;
 use linearize::{Linearize, StaticMap};
 
 #[derive(Linearize)]

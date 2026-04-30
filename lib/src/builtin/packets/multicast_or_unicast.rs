@@ -1,9 +1,9 @@
 use crate::builtin::packets::multicast::MulticastPacket;
 use crate::builtin::packets::unicast::UnicastPacket;
+use crate::node::{NodeData, NodeID};
 use crate::packets::Packet;
 use crate::propagation_models::PropagationParams;
-use crate::types::{Coord, NodeData, NodeID};
-
+use crate::traits::Coord;
 /// A packet which can be either multicast or unicast
 #[derive(Clone, Debug)]
 pub enum MulticastOrUnicast {

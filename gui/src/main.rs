@@ -19,8 +19,10 @@ use manetsim::builtin::node_behaviours::flood::Flood;
 use manetsim::builtin::propagation_models::simple_distance::{
     SimpleDistance, SimpleDistanceParams,
 };
+use manetsim::managers::SimManager;
+use manetsim::node::NodeData;
 use manetsim::stats::InternalEvent;
-use manetsim::types::{NodeData, SimConfig, SimManager};
+use manetsim::traits::SimConfig;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -29,7 +31,7 @@ use tokio::time::{Instant, sleep};
 
 struct App {
     core: cosmic::Core,
-    sim: Arc<RwLock<manetsim::types::SimManager<f32, 2, SimConf>>>,
+    sim: Arc<RwLock<manetsim::managers::SimManager<f32, 2, SimConf>>>,
     sim_canvas: SimCanvas,
     status_text: String,
     tick: usize,

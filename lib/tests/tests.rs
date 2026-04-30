@@ -2,8 +2,8 @@ mod common;
 
 use log::trace;
 use manetsim::builtin::move_behaviours::random_walk::RandomWalk;
+use manetsim::managers::SimManager;
 use manetsim::traffic_generators::mixed_multicast_and_random_target_unicast;
-use manetsim::types::{NodeInit, SimConfig, SimManager};
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
 
@@ -11,6 +11,8 @@ use common::behaviours::{LoggerNode, packet_counter};
 use manetsim::builtin::propagation_models::simple_distance::{
     SimpleDistance, SimpleDistanceParams,
 };
+use manetsim::node::NodeInit;
+use manetsim::traits::SimConfig;
 
 #[test]
 fn ten_ticks_random_walk() {

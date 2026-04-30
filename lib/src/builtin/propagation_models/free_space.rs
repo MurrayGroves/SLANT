@@ -1,5 +1,6 @@
+use crate::node::NodeData;
 use crate::propagation_models::{PropagationModel, PropagationParams};
-use crate::types::{Coord, NodeData};
+use crate::traits::Coord;
 use log::trace;
 use std::f32::consts::PI;
 

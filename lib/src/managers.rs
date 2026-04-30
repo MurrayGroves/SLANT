@@ -1,197 +1,22 @@
+use crate::node::{Node, NodeData, NodeID, NodeInit};
 use crate::packets::Packet;
 use crate::propagation_models::{PropagationModel, PropagationParams};
 use crate::stats::InternalEvent::{PacketLink, PacketTransmit};
 use crate::stats::InternalStatKey::PacketTransmits;
 use crate::stats::TimestepStats;
+use crate::traits::{Coord, NodeBehaviour, SimConfig};
 use kiddo::SquaredEuclidean;
-use kiddo::float_leaf_slice::leaf_slice::{LeafSliceFloat, LeafSliceFloatChunk};
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
-use linearize::Linearize;
 use log::{debug, info, trace};
-use num_traits::Float;
-use rand::RngExt;
-use rand::distr::uniform::SampleUniform;
+use num_traits::{Float, NumCast};
 use rand::distr::{Distribution, StandardUniform};
+use rand::{RngExt, SeedableRng};
 use rand_xoshiro::Xoshiro256Plus;
-use rand_xoshiro::rand_core::SeedableRng;
-use rayon::prelude::*;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::cell::{RefCell, SyncUnsafeCell};
 use std::collections::HashMap;
-use std::fmt::Debug;
-use std::iter::Sum;
 use std::sync::{Arc, Mutex};
 use thread_local::ThreadLocal;
-
-/// Defines a configuration for a particular simulation.
-pub trait SimConfig<A: Coord<K>, const K: usize>
-where
-    <Self::S as Linearize>::Storage<isize>: Send,
-{
-    /// The movement behaviour used by nodes in this simulation.
-    /// If you wish to have multiple different behaviours you may define an enum over them that implements [MoveBehaviour].
-    type MB: MoveBehaviour<A, K>;
-
-    /// The node behaviour used by nodes in this simulation. This defines the logic each node follows for modifying state and sending/processing packets.
-    /// If you wish to have multiple different behaviours you may define an enum over them that implements [NodeBehaviour].
-    type NB: NodeBehaviour<
-            A,
-            K,
-            <<Self as SimConfig<A, K>>::PM as PropagationModel<A, K>>::P,
-            E = <Self as SimConfig<A, K>>::E,
-        >;
-
-    /// The propagation model that decides whether a given transmission between a transmitter and a receiver is received.
-    type PM: PropagationModel<A, K>;
-
-    /// The type used as a key for user-defined metrics. Typically this should be an enum.
-    /// You can use [GlobalStateManager::inc] or [GlobalStateManager::dec] to modify metrics from your behaviours.
-    type S: Linearize = ();
-
-    /// Type for user-defined events, typically would be an enum.
-    /// You can use [GlobalStateManager::add_event] in your behaviours to record an event.
-    type E: Send + Clone = ();
-}
-
-/// Describes a node behaviour which performs some processing each tick to produce a new version of itself.
-pub trait NodeBehaviour<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>>:
-    Sized + Send + Sync + Clone
-{
-    /// Packet type that this node can receive and process.
-    type P: Packet + ?Sized;
-
-    /// Type for events this node behaviour can produce
-    type E = ();
-
-    /// Note that this returns a *new* instance of `Self`, that is you should not modify state, but instead return a new state.
-    /// It does however consume an owned version of itself, so you may (and should) move instead of copying/cloning where possible.
-    fn tick<
-        C: SimConfig<
-                A,
-                K,
-                PM = impl PropagationModel<A, K, P = PP>,
-                NB = impl NodeBehaviour<A, K, PP, P = Self::P, E = Self::E>,
-                E = Self::E,
-            >,
-    >(
-        self,
-        node_data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
-        global_state_manager: &GlobalStateManager<A, K, C>,
-        incoming_packets: &Vec<Self::P>,
-    ) -> Self;
-}
-
-/// Describes a movement behaviour which is ticked each tick and returns a new position for a node.
-pub trait MoveBehaviour<A: Coord<K>, const K: usize>: Sized + Send + Sync + Clone {
-    /// Note that this returns a *new* instance of `Self`, that is you should not modify state, but instead return a new state.
-    /// It does however consume an owned version of itself, so you may (and should) move instead of copying/cloning where possible.
-    fn tick<C: SimConfig<A, K, MB = Self>>(
-        self,
-        data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
-        global_state_manager: &GlobalStateManager<A, K, C>,
-    ) -> (Self, [A; K]);
-}
-
-/// Value in one dimension in a coordinate-space, should be either f32 or f64
-pub trait Coord<const K: usize>:
-    Float
-    + Sum
-    + kiddo::float::kdtree::Axis
-    + LeafSliceFloatChunk<u32, K>
-    + LeafSliceFloat<u32>
-    + SampleUniform
-    + Sized
-    + Clone
-    + PartialEq
-{
-}
-
-impl<const K: usize> Coord<K> for f32 {}
-
-impl<const K: usize> Coord<K> for f64 {}
-
-/// Stores behaviour-agnostic state for a node.
-#[derive(Clone, Debug)]
-pub struct NodeData<A: Coord<K>, const K: usize, P: PropagationParams<A, K> + Sized>
-where
-    Self: Sized,
-{
-    /// Current position of the node in your coordinate-space.
-    pub position: [A; K],
-    /// Unique ID of the node, assigned incrementally at the start of the simulation.
-    pub id: NodeID,
-    /// Holds whatever parameters your propagation model needs - e.g. transmit power, directionality
-    pub propagation_params: P,
-}
-
-pub type NodeID = usize;
-
-#[derive(Clone)]
-pub struct Node<
-    NB: NodeBehaviour<A, K, P> + Sized,
-    MB: MoveBehaviour<A, K> + Sized,
-    P: PropagationParams<A, K> + Sized,
-    A: Coord<K> + Sized,
-    const K: usize,
-> where
-    Self: Sized,
-{
-    behaviour: NB,
-    move_behaviour: MB,
-    pub(crate) data: NodeData<A, K, P>,
-}
-
-impl<
-    NB: NodeBehaviour<A, K, P>,
-    MB: MoveBehaviour<A, K>,
-    A: Coord<K>,
-    const K: usize,
-    P: PropagationParams<A, K>,
-> Node<NB, MB, P, A, K>
-{
-    pub fn node_behaviour(&self) -> &NB {
-        &self.behaviour
-    }
-
-    pub fn move_behaviour(&self) -> &MB {
-        &self.move_behaviour
-    }
-
-    /// Ticks node behaviour and updates the behaviour to its new state.
-    fn tick_node_behaviour<PM, C: SimConfig<A, K, PM = PM, NB = NB, E = NB::E>>(
-        self,
-        global_state_manager: &GlobalStateManager<A, K, C>,
-        incoming_packets: &Vec<NB::P>,
-    ) -> Self
-    where
-        PM: PropagationModel<A, K, P = P>,
-    {
-        Self {
-            behaviour: self
-                .behaviour
-                .tick(&self.data, global_state_manager, incoming_packets),
-            data: self.data,
-            move_behaviour: self.move_behaviour,
-        }
-    }
-
-    /// Ticks movement behaviour and updates the behaviour to its new state.
-    fn tick_movement_behaviour<
-        PM: PropagationModel<A, K, P = P>,
-        C: SimConfig<A, K, PM = PM, MB = MB, NB = NB>,
-    >(
-        mut self,
-        global_state_manager: &GlobalStateManager<A, K, C>,
-    ) -> Self {
-        let (move_behaviour, position) = self.move_behaviour.tick(&self.data, global_state_manager);
-        self.move_behaviour = move_behaviour;
-        self.data.position = position;
-        self
-    }
-
-    pub fn data(&self) -> &NodeData<A, K, P> {
-        &self.data
-    }
-}
 
 /// Holds the state of the simulation at a specific tick
 pub struct GlobalStateManager<A: Coord<K>, const K: usize, C: SimConfig<A, K>> {
@@ -277,9 +102,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
         );
         stats
     }
-}
 
-impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C> {
     /// Returns new state
     fn tick(mut self) -> Self {
         debug!("Ticking with {:?} threads", rayon::current_num_threads());
@@ -387,6 +210,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
             recipients.len(),
             transmitter.propagation_params.prune_distance()
         );
+
         for recipient in recipients {
             #[cfg(not(feature = "disable_internal_events"))]
             stats.add_internal_event(PacketLink((transmitter.id, *recipient)));
@@ -479,19 +303,4 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
             take_mut::take(&mut self.global_state_manager, |state| state.tick());
         }
     }
-}
-
-/// Constructed by end-user and passed into construction of sim to construct a [Node] instance.
-#[derive(Clone)]
-pub struct NodeInit<
-    NB: NodeBehaviour<A, K, P>,
-    MB: MoveBehaviour<A, K>,
-    P: PropagationParams<A, K>,
-    A: Coord<K>,
-    const K: usize,
-> {
-    pub starting_position: [A; K],
-    pub node_behaviour: NB,
-    pub move_behaviour: MB,
-    pub propagation_params: P,
 }

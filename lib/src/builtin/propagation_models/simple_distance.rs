@@ -1,5 +1,6 @@
+use crate::node::NodeData;
 use crate::propagation_models::{PropagationModel, PropagationParams};
-use crate::types::{Coord, NodeData};
+use crate::traits::Coord;
 
 /// A simple propagation model which only accepts packets within a radius specified in [SimpleDistanceParams]
 #[derive(Clone, Copy)]

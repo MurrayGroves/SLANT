@@ -1,6 +1,8 @@
+use crate::managers::GlobalStateManager;
+use crate::node::NodeData;
 use crate::packets::Packet;
 use crate::propagation_models::{PropagationModel, PropagationParams};
-use crate::types::{Coord, GlobalStateManager, NodeBehaviour, NodeData, SimConfig};
+use crate::traits::{Coord, NodeBehaviour, SimConfig};
 use log::trace;
 use std::sync::Arc;
 
