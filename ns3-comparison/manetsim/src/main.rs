@@ -14,6 +14,7 @@ use std::fmt::Debug;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::time::Instant;
 
 #[derive(Clone)]
 pub struct Flood<A: Coord<K>, const K: usize> {
@@ -180,6 +181,8 @@ fn generate_nodes<MB: MoveBehaviour<f32, 2>, P: PropagationParams<f32, 2>>(
 fn main() {
     env_logger::init();
 
+    let start = Instant::now();
+
     let num_nodes = env::var("NUM_NODES")
         .unwrap_or("1024".into())
         .parse::<usize>()
@@ -219,4 +222,5 @@ fn main() {
 
     info!("Received {} packets total", received_packets);
     info!("Originated {} packets total", originated_packets);
+    info!("Simulation took {}", start.elapsed().as_secs_f64());
 }

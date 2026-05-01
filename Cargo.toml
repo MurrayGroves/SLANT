@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["lib", "gui", "ns3-comparison/flood-benchmark"]
+members = ["lib", "gui", "ns3-comparison/manetsim"]
 
 [profile.release-with-debug]
 inherits = "release"
