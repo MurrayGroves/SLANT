@@ -1,6 +1,6 @@
+use crate::Coord;
 use crate::node::NodeData;
 use crate::propagation_models::{PropagationModel, PropagationParams};
-use crate::traits::Coord;
 use log::trace;
 use std::f32::consts::PI;
 
@@ -61,7 +61,7 @@ impl<A: Coord<K>, const K: usize> PropagationModel<A, K> for FreeSpace {
 pub struct FreeSpaceParams<A: Coord<K>, const K: usize> {
     /// Transmit power in dB
     pub transmit_power: A,
-    /// Wavelength in the same unit as [A]
+    /// Wavelength in the same unit as A
     pub wave_length: A,
     /// Function which returns the transmit gain for this transmitter given the current node data and direction vector
     pub transmit_gain: fn(&NodeData<A, K, Self>, [A; K]) -> A,

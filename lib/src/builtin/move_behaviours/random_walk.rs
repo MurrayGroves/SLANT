@@ -1,7 +1,8 @@
+use crate::behaviours::MoveBehaviour;
 use crate::managers::GlobalStateManager;
 use crate::node::NodeData;
 use crate::propagation_models::PropagationModel;
-use crate::traits::{Coord, MoveBehaviour, SimConfig};
+use crate::{Coord, SimConfig};
 use num_traits::Float;
 
 /// Movement behaviour which moves nodes at a constant behaviour, changing direction randomly at a configurable tick interval

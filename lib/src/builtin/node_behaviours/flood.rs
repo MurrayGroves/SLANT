@@ -1,8 +1,9 @@
+use crate::behaviours::NodeBehaviour;
 use crate::managers::GlobalStateManager;
 use crate::node::NodeData;
 use crate::packets::{GloballySequencedPacket, Packet};
 use crate::propagation_models::{PropagationModel, PropagationParams};
-use crate::traits::{Coord, NodeBehaviour, SimConfig};
+use crate::{Coord, SimConfig};
 use log::trace;
 use num_traits::{Num, NumCast, One, Zero};
 use std::collections::HashSet;

@@ -1,10 +1,11 @@
-use crate::builtin::packets::multicast::MulticastPacket;
-use crate::builtin::packets::multicast_or_unicast::MulticastOrUnicast;
-use crate::builtin::packets::unicast::UnicastPacket;
-use crate::managers::GlobalStateManager;
-use crate::node::NodeID;
-use crate::propagation_models::PropagationModel;
-use crate::traits::{Coord, NodeBehaviour, SimConfig};
+use manetsim::behaviours::NodeBehaviour;
+use manetsim::builtin::packets::multicast::MulticastPacket;
+use manetsim::builtin::packets::multicast_or_unicast::MulticastOrUnicast;
+use manetsim::builtin::packets::unicast::UnicastPacket;
+use manetsim::managers::GlobalStateManager;
+use manetsim::node::NodeID;
+use manetsim::propagation_models::PropagationModel;
+use manetsim::{Coord, SimConfig};
 use rand::RngExt;
 
 /// Generates a certain number of [UnicastPacket]s and a certain number of [MulticastPacket]s and transmits them from random nodes in the network.
@@ -28,21 +29,21 @@ pub fn mixed_multicast_and_random_target_unicast<
     num_unicast: usize,
 ) {
     for _ in 0..num_multicast {
-        let index = rng.random_range(0..global_state_manager.nodes.len());
+        let index = rng.random_range(0..global_state_manager.nodes().len());
         let mut bytes: [u8; 32] = [0; 32];
         rng.fill(&mut bytes);
         let packet = MulticastPacket {
             content: Box::new(bytes),
         };
         global_state_manager.transmit_packet(
-            &global_state_manager.nodes[index].data,
+            &global_state_manager.nodes()[index].data(),
             MulticastOrUnicast::MulticastPacket(packet),
         )
     }
 
     for _ in 0..num_unicast {
-        let index = rng.random_range(0..global_state_manager.nodes.len());
-        let target_id: NodeID = rng.random_range(0..global_state_manager.nodes.len());
+        let index = rng.random_range(0..global_state_manager.nodes().len());
+        let target_id: NodeID = rng.random_range(0..global_state_manager.nodes().len());
         let mut bytes: [u8; 32] = [0; 32];
         rng.fill(&mut bytes);
         let packet = UnicastPacket {
@@ -50,7 +51,7 @@ pub fn mixed_multicast_and_random_target_unicast<
             target: target_id,
         };
         global_state_manager.transmit_packet(
-            &global_state_manager.nodes[index].data,
+            &global_state_manager.nodes()[index].data(),
             MulticastOrUnicast::UnicastPacket(packet),
         )
     }

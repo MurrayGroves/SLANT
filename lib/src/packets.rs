@@ -1,6 +1,7 @@
+//! Traits for packets and potential properties they can have.
+use crate::Coord;
 use crate::node::{NodeData, NodeID};
 use crate::propagation_models::PropagationParams;
-use crate::traits::Coord;
 use num_traits::Num;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -40,7 +41,7 @@ pub trait LocallySequencedPacket: OriginatedPacket {
 
 /// A packet that can provide a sequence number uniquely identifying this packet globally.
 /// If your packet implements [LocallySequencedPacket], you should probably just implement
-/// this as a concatenation of the originator and the local sequence number.
+/// this as a hash of the originator and the local sequence number.
 pub trait GloballySequencedPacket: Packet {
     /// Type for sequence number
     type S: Num + Send + Sync + Copy + Eq + Hash + AddAssign + Debug;

@@ -14,6 +14,7 @@ use cosmic::prelude::*;
 use cosmic::widget::{Canvas, canvas, container};
 use cosmic::{Core, iced, widget};
 use log::{debug, info};
+use manetsim::SimConfig;
 use manetsim::builtin::move_behaviours::random_walk::RandomWalk;
 use manetsim::builtin::node_behaviours::flood::Flood;
 use manetsim::builtin::propagation_models::simple_distance::{
@@ -22,7 +23,6 @@ use manetsim::builtin::propagation_models::simple_distance::{
 use manetsim::managers::SimManager;
 use manetsim::node::NodeData;
 use manetsim::stats::InternalEvent;
-use manetsim::traits::SimConfig;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::RwLock;

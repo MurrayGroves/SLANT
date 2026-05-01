@@ -1,7 +1,10 @@
+//! Types for handling nodes and their states.
+
+use crate::behaviours::{MoveBehaviour, NodeBehaviour};
 use crate::managers::GlobalStateManager;
 use crate::propagation_models::{PropagationModel, PropagationParams};
-use crate::traits::{Coord, MoveBehaviour, NodeBehaviour, SimConfig};
-
+use crate::{Coord, SimConfig};
+/// Unique ID assigned sequentially at simulation start
 pub type NodeID = usize;
 
 /// Stores behaviour-agnostic state for a node.

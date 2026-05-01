@@ -1,4 +1,5 @@
 use log::trace;
+use manetsim::behaviours::NodeBehaviour;
 use manetsim::builtin::move_behaviours::random_walk::RandomWalk;
 use manetsim::builtin::propagation_models::simple_distance::{
     SimpleDistance, SimpleDistanceParams,
@@ -7,7 +8,7 @@ use manetsim::managers::GlobalStateManager;
 use manetsim::node::{NodeData, NodeID, NodeInit};
 use manetsim::packets::{GloballySequencedPacket, Packet};
 use manetsim::propagation_models::{PropagationModel, PropagationParams};
-use manetsim::traits::{Coord, NodeBehaviour, SimConfig};
+use manetsim::{Coord, SimConfig};
 use num_traits::{Num, NumCast, One, Zero};
 use std::collections::HashSet;
 use std::fmt::Debug;

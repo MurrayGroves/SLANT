@@ -6,7 +6,7 @@ use manetsim::managers::SimManager;
 use manetsim::node::{NodeData, NodeID, NodeInit};
 use manetsim::packets::Packet;
 use manetsim::propagation_models::PropagationParams;
-use manetsim::traits::{Coord, SimConfig};
+use manetsim::{Coord, SimConfig};
 use std::sync::Arc;
 
 #[test]

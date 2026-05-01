@@ -1,8 +1,8 @@
+use crate::behaviours::MoveBehaviour;
 use crate::managers::GlobalStateManager;
 use crate::node::NodeData;
 use crate::propagation_models::PropagationModel;
-use crate::traits::{Coord, MoveBehaviour, SimConfig};
-
+use crate::{Coord, SimConfig};
 #[derive(Clone)]
 pub struct StaticMovement {}
 

@@ -1,3 +1,4 @@
+//! Allows for the logging of user-defined metrics and events.
 use crate::node::NodeID;
 use linearize::{Linearize, StaticMap};
 

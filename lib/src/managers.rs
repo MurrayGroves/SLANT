@@ -1,14 +1,15 @@
+//! Structs that manage the simulation and its state.
+use crate::behaviours::NodeBehaviour;
 use crate::node::{Node, NodeData, NodeID, NodeInit};
 use crate::packets::Packet;
 use crate::propagation_models::{PropagationModel, PropagationParams};
 use crate::stats::InternalEvent::{PacketLink, PacketTransmit};
 use crate::stats::InternalStatKey::PacketTransmits;
 use crate::stats::TimestepStats;
-use crate::traits::{Coord, NodeBehaviour, SimConfig};
+use crate::{Coord, SimConfig};
 use kiddo::SquaredEuclidean;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
 use log::{debug, info, trace};
-use num_traits::{Float, NumCast};
 use rand::distr::{Distribution, StandardUniform};
 use rand::{RngExt, SeedableRng};
 use rand_xoshiro::Xoshiro256Plus;

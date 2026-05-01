@@ -1,4 +1,3 @@
-use std::sync::Arc;
-
 pub mod behaviours;
+pub mod traffic_generators;
 mod types;
