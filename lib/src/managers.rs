@@ -5,7 +5,7 @@ use crate::packets::Packet;
 use crate::propagation_models::{PropagationModel, PropagationParams};
 use crate::stats::InternalEvent::{PacketLink, PacketTransmit};
 use crate::stats::InternalStatKey::PacketTransmits;
-use crate::stats::TimestepStats;
+use crate::stats::{InternalStatKey, TimestepStats};
 use crate::{Coord, SimConfig};
 use kiddo::SquaredEuclidean;
 use kiddo::immutable::float::kdtree::ImmutableKdTree;
@@ -89,7 +89,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
     }
 
     /// Calling this will clear the internal stats buffer, so you can only call it once per tick!
-    pub fn consume_stats(&mut self) -> TimestepStats<C::S, C::E> {
+    pub(crate) fn consume_stats(&mut self) -> TimestepStats<C::S, C::E> {
         let mut stats = TimestepStats::new();
         for thread in Arc::into_inner(std::mem::take(&mut self.stats))
             .unwrap()
@@ -104,8 +104,8 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
         stats
     }
 
-    /// Returns new state
-    fn tick(mut self) -> Self {
+    /// Returns stats generated during tick.
+    pub(crate) fn tick(&mut self) -> TimestepStats<C::S, C::E> {
         debug!("Ticking with {:?} threads", rayon::current_num_threads());
         self.stats = Arc::new(ThreadLocal::new());
         let nodes: Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> = (*self
@@ -131,29 +131,31 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
             .into_par_iter()
             .map(|x| {
                 let packets = self.incoming_packets.get(&x.data.id).unwrap();
+                #[cfg(not(feature = "disable_internal_stats"))]
+                self.stats
+                    .get_or_default()
+                    .borrow_mut()
+                    .inc_internal(InternalStatKey::PacketReceives, packets.len() as isize);
                 x.tick_node_behaviour(&self, packets)
             })
             .collect();
 
         // The only time we have other Arcs is during ticking
-        let new_packets = Arc::into_inner(self.new_packets).unwrap();
+        let new_packets = Arc::into_inner(std::mem::take(&mut self.new_packets)).unwrap();
 
-        Self {
-            tree: Arc::new(tree),
-            incoming_packets: Arc::new(
-                new_packets
-                    .into_iter()
-                    .map(|(id, packets)| (id, packets.into_inner().unwrap()))
-                    .collect(),
-            ),
-            new_packets: Arc::new(HashMap::from_iter(
-                (0..nodes.len()).map(|x| (x, Mutex::new(Vec::new()))),
-            )), // TODO - Don't instantiate a new one each tick!
-            rngs: self.rngs,
-            nodes: Arc::new(nodes),
-            propagation_model: self.propagation_model,
-            stats: self.stats,
-        }
+        self.tree = Arc::new(tree);
+        self.incoming_packets = Arc::new(
+            new_packets
+                .into_iter()
+                .map(|(id, packets)| (id, packets.into_inner().unwrap()))
+                .collect(),
+        );
+        self.new_packets = Arc::new(HashMap::from_iter(
+            (0..nodes.len()).map(|x| (x, Mutex::new(Vec::new()))),
+        ));
+        self.nodes = Arc::new(nodes);
+
+        self.consume_stats()
     }
 
     /// Transmit a packet, the propagation model will be used to decide which nodes receive it.
@@ -297,11 +299,18 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
         }
     }
 
-    /// Perform `n` ticks of the simulation, returning the new global state at the end
-    pub fn n_ticks(&mut self, num_ticks: usize) {
+    /// Perform `n` ticks of the simulation, returning the stats generated during those ticks.
+    pub fn n_ticks(&mut self, num_ticks: usize) -> Vec<TimestepStats<C::S, C::E>> {
+        let mut stats = Vec::with_capacity(num_ticks);
         for i in 0..num_ticks {
             info!("Doing tick {}", i);
-            take_mut::take(&mut self.global_state_manager, |state| state.tick());
+            stats.push(self.global_state_manager.tick());
         }
+        stats
+    }
+
+    /// Perform one tick of the simulation, returning the stats generated during the tick.
+    pub fn tick(&mut self) -> TimestepStats<C::S, C::E> {
+        self.global_state_manager.tick()
     }
 }

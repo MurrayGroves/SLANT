@@ -3,6 +3,7 @@ use crate::managers::GlobalStateManager;
 use crate::node::NodeData;
 use crate::propagation_models::PropagationModel;
 use crate::{Coord, SimConfig};
+/// Movement behaviour that doesn't move the node.
 #[derive(Clone)]
 pub struct StaticMovement {}
 

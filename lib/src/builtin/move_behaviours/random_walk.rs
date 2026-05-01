@@ -5,7 +5,8 @@ use crate::propagation_models::PropagationModel;
 use crate::{Coord, SimConfig};
 use num_traits::Float;
 
-/// Movement behaviour which moves nodes at a constant behaviour, changing direction randomly at a configurable tick interval
+/// Movement behaviour which moves nodes at a constant velocity, changing direction randomly at a configurable tick interval.
+/// `CHANGE_DELAY` is in ticks. E.g. a change delay of 8 will cause the node to change direction every 8 ticks.
 #[derive(Clone)]
 pub struct RandomWalk<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> {
     /// Incremented each tick
@@ -20,8 +21,6 @@ impl<const CHANGE_DELAY: u8, A: Coord<K>, const K: usize> RandomWalk<CHANGE_DELA
     /// # Arguments
     ///
     /// * `velocity`: The node will always move at this velocity
-    ///
-    /// returns: RandomWalk<{ CHANGE_DELAY }, A, { K }>
     pub fn new(velocity: A) -> Self {
         Self {
             tick_counter: 0,

@@ -205,9 +205,8 @@ impl cosmic::Application for App {
                     let result = tokio::task::spawn_blocking(async move || {
                         let mut sim = sim.write().await;
                         let start = Instant::now();
-                        sim.n_ticks(1);
+                        let mut stats = sim.tick();
                         debug!("Tick finished after {:?}", start.elapsed());
-                        let stats = sim.global_state_manager.consume_stats().events();
                         SimData {
                             nodes: sim
                                 .global_state_manager
@@ -215,8 +214,8 @@ impl cosmic::Application for App {
                                 .iter()
                                 .map(|x| x.data().clone())
                                 .collect(),
-                            events: stats.0,
-                            seq_transmits: stats.1,
+                            events: stats.internal_events(),
+                            seq_transmits: stats.events(),
                         }
                     })
                     .await

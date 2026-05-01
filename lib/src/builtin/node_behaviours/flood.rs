@@ -1,3 +1,4 @@
+//! Flood routing protocol, whereby packets are rebroadcast up to a hop limit.
 use crate::behaviours::NodeBehaviour;
 use crate::managers::GlobalStateManager;
 use crate::node::NodeData;
@@ -10,8 +11,11 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
+/// Implements the flooding protocol.
+/// New packets have a set hop count. Upon receiving a packet, a node will check if the hop count is above zero. If it is, it will decrement it and rebroadcast the packet.
 #[derive(Clone)]
 pub struct Flood<PT: FloodPacket + Clone + ?Sized, A: Coord<K>, const K: usize> {
+    /// Sequence numbers of packets that this node has seen
     seen_packets: HashSet<PT::S>,
     coord_type: PhantomData<A>,
     /// Seq of most recent packet generated
@@ -20,6 +24,7 @@ pub struct Flood<PT: FloodPacket + Clone + ?Sized, A: Coord<K>, const K: usize> 
     hop_count: usize,
 }
 
+/// Any packet which provides a hop count can be used with [Flood].
 pub trait FloodPacket: Packet + GloballySequencedPacket + Clone {
     /// Type of hop count
     type H: Num + NumCast + PartialOrd + Zero;

@@ -1,3 +1,4 @@
+//! A wrapping behaviour which encapsulates another behaviour and also generates packets every `N` ticks.
 use crate::behaviours::NodeBehaviour;
 use crate::managers::GlobalStateManager;
 use crate::node::NodeData;
@@ -7,6 +8,10 @@ use crate::{Coord, SimConfig};
 use log::trace;
 use std::sync::Arc;
 
+/// This behaviour can contain any type which is also a behaviour.
+/// Every tick it will also tick its contained behaviour.
+/// Every `N` ticks it will call a provided closure to generate a new packet, then broadcast it.
+/// The closure is provided with the contained behaviour so you can use its state.
 #[derive(Clone)]
 pub struct Monotonic<
     A: Coord<K>,
@@ -17,7 +22,6 @@ pub struct Monotonic<
 > {
     pub ticks_per_packet: usize,
     counter: usize,
-    pub received_packets: usize,
     gen_packet: Arc<dyn Fn(&mut T, &NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
     pub contained: T,
 }
@@ -30,6 +34,11 @@ impl<
     P: Packet,
 > Monotonic<A, K, T, P, PP>
 {
+    /// # Arguments
+    ///
+    /// * `contained`: The behaviour that will be wrapped and ticked each tick.
+    /// * `ticks_per_packet`: How many ticks the behaviour should wait in-between transmissions.
+    /// * `gen_packet`: A closure which accepts the contained behaviour, the node's data, and some bytes the packet should contain. It should return a new packet.
     pub fn new(
         contained: T,
         ticks_per_packet: usize,
@@ -38,7 +47,6 @@ impl<
         Monotonic {
             ticks_per_packet,
             counter: 0,
-            received_packets: 0,
             gen_packet,
             contained,
         }
@@ -72,12 +80,6 @@ impl<
         incoming_packets: &Vec<Self::P>,
     ) -> Self {
         trace!("Ticking {}", node_data.id);
-        self.received_packets += incoming_packets.len();
-        trace!(
-            "{} received {:?}",
-            node_data.id,
-            incoming_packets.iter().map(|x| x.content_ref()[0])
-        );
 
         if self.counter % self.ticks_per_packet == 0 {
             global_state_manager.transmit_packet(

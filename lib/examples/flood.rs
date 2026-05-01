@@ -7,6 +7,7 @@ use manetsim::managers::{GlobalStateManager, SimManager};
 use manetsim::node::{NodeData, NodeID, NodeInit};
 use manetsim::packets::{GloballySequencedPacket, Packet};
 use manetsim::propagation_models::{PropagationModel, PropagationParams};
+use manetsim::stats::InternalStatKey;
 use manetsim::{Coord, SimConfig};
 use std::collections::HashSet;
 use std::env;
@@ -208,14 +209,18 @@ fn main() {
 
     let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, FreeSpace);
 
-    sim.n_ticks(10);
+    let stats = sim.n_ticks(10);
 
-    let mut received_packets = 0;
     let mut originated_packets = 0;
     for node in sim.global_state_manager.nodes() {
-        received_packets += node.node_behaviour().received_packets;
         originated_packets += node.node_behaviour().contained.seq();
     }
+
+    let received_packets = stats
+        .into_iter()
+        .map(|mut x| x.internal_stats()[InternalStatKey::PacketReceives])
+        .reduce(std::ops::Add::add)
+        .unwrap_or_default();
 
     info!("Received {} packets total", received_packets);
     info!("Originated {} packets total", originated_packets);
