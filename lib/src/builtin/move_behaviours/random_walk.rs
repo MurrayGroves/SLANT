@@ -1,3 +1,4 @@
+//! Moves nodes at a constant velocity, changing direction randomly at set intervals.
 use crate::behaviours::MoveBehaviour;
 use crate::managers::GlobalStateManager;
 use crate::node::NodeData;

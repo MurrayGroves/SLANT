@@ -1,3 +1,4 @@
+//! Uses the Friis transmission equation.
 use crate::Coord;
 use crate::node::NodeData;
 use crate::propagation_models::{PropagationModel, PropagationParams};

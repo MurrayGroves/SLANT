@@ -1,3 +1,4 @@
+//! Empty movement behaviour that keeps nodes stationary.
 use crate::behaviours::MoveBehaviour;
 use crate::managers::GlobalStateManager;
 use crate::node::NodeData;

@@ -1,8 +1,9 @@
+//! Allows packets to be received if below a certain distance.
 use crate::Coord;
 use crate::node::NodeData;
 use crate::propagation_models::{PropagationModel, PropagationParams};
 
-/// A simple propagation model which only accepts packets within a radius specified in [SimpleDistanceParams]
+/// A simple propagation model which only accepts packets within a radius specified in [SimpleDistanceParams].
 #[derive(Clone, Copy)]
 pub struct SimpleDistance;
 
