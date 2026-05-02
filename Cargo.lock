@@ -3081,6 +3081,7 @@ dependencies = [
  "rand 0.10.0",
  "rand_xoshiro",
  "rayon",
+ "serde",
  "take_mut",
  "thread_local",
 ]
