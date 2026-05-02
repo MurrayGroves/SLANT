@@ -1,3 +1,4 @@
+//! A packet which can be received only by a specific node.
 use crate::Coord;
 use crate::node::{NodeData, NodeID};
 use crate::packets::Packet;
@@ -7,7 +8,9 @@ use std::fmt::{Debug, Formatter};
 /// A packet which can only be received by a specific node
 #[derive(Clone)]
 pub struct UnicastPacket {
+    /// The node which can receive this packet.
     pub target: NodeID,
+    /// The bytes content of the packet.
     pub content: Box<[u8]>,
 }
 

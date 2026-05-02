@@ -20,9 +20,12 @@ pub struct Monotonic<
     P: Packet,
     PP: PropagationParams<A, K>,
 > {
+    /// Interval between each packet generation in ticks.
+    /// E.g. with a value of `5` a packet will be generated every 5th tick.
     pub ticks_per_packet: usize,
     counter: usize,
     gen_packet: Arc<dyn Fn(&mut T, &NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
+    /// The contained behaviour which is ticked by Monotonic.
     pub contained: T,
 }
 
@@ -65,6 +68,8 @@ impl<
     type P = P;
     type E = E;
 
+    /// Ticks contained behaviour.
+    /// Generates a new packet from the given closure every `ticks_per_packet` ticks.
     fn tick<
         C: SimConfig<
                 A,

@@ -21,6 +21,7 @@ where
     pub propagation_params: P,
 }
 
+/// Holds a node's state during a tick.
 #[derive(Clone)]
 pub struct Node<
     NB: NodeBehaviour<A, K, P> + Sized,
@@ -44,14 +45,17 @@ impl<
     P: PropagationParams<A, K>,
 > Node<NB, MB, P, A, K>
 {
+    /// Borrow the [NodeBehaviour] for this node.
     pub fn node_behaviour(&self) -> &NB {
         &self.behaviour
     }
 
+    /// Borrow the [MoveBehaviour] for this node.
     pub fn move_behaviour(&self) -> &MB {
         &self.move_behaviour
     }
 
+    /// Borrow the [NodeData] for this node, which includes position and propagation parameters.
     pub fn data(&self) -> &NodeData<A, K, P> {
         &self.data
     }
@@ -89,7 +93,7 @@ impl<
     }
 }
 
-/// Constructed by end-user and passed into construction of sim to construct a [Node] instance.
+/// Used to define the starting state of a [Node].
 #[derive(Clone)]
 pub struct NodeInit<
     NB: NodeBehaviour<A, K, P>,
@@ -98,8 +102,12 @@ pub struct NodeInit<
     A: Coord<K>,
     const K: usize,
 > {
+    /// The position the node starts the simulation at.
     pub starting_position: [A; K],
+    /// The [NodeBehaviour] the node should tick.
     pub node_behaviour: NB,
+    /// The [MoveBehaviour] the node should tick.
     pub move_behaviour: MB,
+    /// The [PropagationParams] the node uses to transmit and receive packets.
     pub propagation_params: P,
 }

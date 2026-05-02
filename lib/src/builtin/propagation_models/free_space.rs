@@ -75,6 +75,22 @@ pub struct FreeSpaceParams<A: Coord<K>, const K: usize> {
 }
 
 impl<A: Coord<K>, const K: usize> FreeSpaceParams<A, K> {
+    /// # Arguments
+    ///
+    /// * `transmit_power`: Transmit power of the node in dB
+    /// * `wave_length`: Wavelength of the transmissions in the same unit as your coordinates.
+    /// * `transmit_gain`: A function that accepts in [NodeData] and a direction vector and returns the transmission gain for that direction in dBi.
+    /// * `max_transmit_gain`: The maximum transmission gain the node has in any direction in dBi.
+    /// * `receive_gain`: A function that accepts in [NodeData] and a direction vector and returns the receive gain for that direction in dBi.
+    /// * `mds`: The minimum detectable signal an incoming transmission must reach to be received in dBm.
+    ///
+    /// returns: FreeSpaceParams<A, { K }>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     pub fn new(
         transmit_power: A,
         wave_length: A,

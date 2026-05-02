@@ -1,13 +1,17 @@
+//! A packet which can be either multicast or unicast.
 use crate::Coord;
 use crate::builtin::packets::multicast::MulticastPacket;
 use crate::builtin::packets::unicast::UnicastPacket;
 use crate::node::{NodeData, NodeID};
 use crate::packets::Packet;
 use crate::propagation_models::PropagationParams;
+
 /// A packet which can be either multicast or unicast
 #[derive(Clone, Debug)]
 pub enum MulticastOrUnicast {
+    /// A packet which can be received by any node.
     MulticastPacket(MulticastPacket),
+    /// A packet which can be received only by a specific node.
     UnicastPacket(UnicastPacket),
 }
 

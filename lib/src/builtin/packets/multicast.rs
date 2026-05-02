@@ -1,12 +1,14 @@
+//! A packet which can be received by any node.
 use crate::Coord;
 use crate::node::{NodeData, NodeID};
 use crate::packets::Packet;
 use crate::propagation_models::PropagationParams;
 use std::fmt::{Debug, Formatter};
 
-/// A packet which can be received by any node
+/// A packet which can be received by any node.
 #[derive(Clone)]
 pub struct MulticastPacket {
+    /// Bytes content of packet.
     pub content: Box<[u8]>,
 }
 

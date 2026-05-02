@@ -9,8 +9,10 @@ use std::ops::AddAssign;
 
 /// A packet which can be received by nodes in the network
 pub trait Packet: Debug + Send + Sync + Clone {
+    /// Should return the bytes content of the packet.
     fn content(self) -> Box<[u8]>;
 
+    /// Should borrow the bytes content of the packet.
     fn content_ref(&self) -> &Box<[u8]>;
 
     /// Returns a vec of all NodeIDs which could receive the packet if they are in range.
@@ -35,7 +37,10 @@ pub trait OriginatedPacket: Packet {
 
 /// A packet that can provide a sequence number uniquely identifying this packet w.r.t its originator
 pub trait LocallySequencedPacket: OriginatedPacket {
+    /// Type for the sequence number.
     type S: Num + Send + Sync + Clone + Eq + Hash;
+
+    /// Returns a sequence number for the packet which is unique for the originating node.
     fn seq(&self) -> Self::S;
 }
 
@@ -45,5 +50,7 @@ pub trait LocallySequencedPacket: OriginatedPacket {
 pub trait GloballySequencedPacket: Packet {
     /// Type for sequence number
     type S: Num + Send + Sync + Copy + Eq + Hash + AddAssign + Debug;
+
+    /// Returns a sequence number for the packet which is unique across the network.
     fn seq(&self) -> Self::S;
 }

@@ -1,7 +1,9 @@
 //! Allows for the logging of user-defined metrics and events.
+//! The simulator also records internal stats and events which may be disabled with the `disable_internal_stats` and `disable_internal_events` package features.
 use crate::node::NodeID;
 use linearize::{Linearize, StaticMap};
 
+/// Key for stats that the simulator tracks internally.
 #[derive(Linearize)]
 pub enum InternalStatKey {
     /// Number of packets transmitted across a tick.
@@ -30,7 +32,7 @@ pub struct TimestepStats<T: Linearize, E: Clone> {
 }
 
 impl<T: Linearize, E: Clone> TimestepStats<T, E> {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             internal: StaticMap::default(),
             user: StaticMap::default(),
@@ -103,6 +105,7 @@ impl<T: Linearize, E: Clone> TimestepStats<T, E> {
     }
 
     #[cfg(not(feature = "disable_internal_stats"))]
+    /// Consume and return internal stats, will be left empty afterwards.
     pub fn internal_stats(&mut self) -> StaticMap<InternalStatKey, isize> {
         std::mem::take(&mut self.internal)
     }

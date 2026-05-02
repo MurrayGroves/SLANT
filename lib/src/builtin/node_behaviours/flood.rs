@@ -28,10 +28,14 @@ pub struct Flood<PT: FloodPacket + Clone + ?Sized, A: Coord<K>, const K: usize> 
 pub trait FloodPacket: Packet + GloballySequencedPacket + Clone {
     /// Type of hop count
     type H: Num + NumCast + PartialOrd + Zero;
+
+    /// Get the packet's current hop count.
     fn get_hop_count(&self) -> <Self as FloodPacket>::H;
 
+    /// Set the packet's current hop count.
     fn set_hop_count(&mut self, count: <Self as FloodPacket>::H);
 
+    /// Create a new packet with specified hops and sequence number.
     fn new<A: Coord<K>, const K: usize>(
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
         hops: Self::H,
@@ -53,6 +57,7 @@ where
 {
     type P = PT;
 
+    /// Processes incoming packets, rebroadcasting them if their hop count is above zero.
     fn tick<
         C: SimConfig<
                 A,
@@ -90,6 +95,7 @@ where
 }
 
 impl<PT: FloodPacket + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
+    /// Create new flood behaviour with a specified default hop count for new packets.
     pub fn new(hops: usize) -> Self {
         Self {
             seen_packets: HashSet::new(),
@@ -99,6 +105,7 @@ impl<PT: FloodPacket + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
         }
     }
 
+    /// Generate a new packet with an incremented sequence number.
     pub fn gen_packet(
         &mut self,
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
@@ -116,6 +123,7 @@ impl<PT: FloodPacket + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
 }
 
 impl<PT: FloodPacket + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
+    /// Returns the sequence number (how many packets have been sent from the node).
     pub fn seq(&self) -> PT::S {
         self.seq
     }

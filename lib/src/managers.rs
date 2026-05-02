@@ -1,5 +1,8 @@
 //! Structs that manage the simulation and its state.
 use crate::behaviours::NodeBehaviour;
+use crate::builtin::move_behaviours::static_movement::StaticMovement;
+use crate::builtin::node_behaviours::monotonic::Monotonic;
+use crate::builtin::propagation_models::free_space::{FreeSpace, FreeSpaceParams};
 use crate::node::{Node, NodeData, NodeID, NodeInit};
 use crate::packets::Packet;
 use crate::propagation_models::{PropagationModel, PropagationParams};
@@ -84,6 +87,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
         }
     }
 
+    /// Borrow the internal node storage, useful for retrieving state from your behaviours.
     pub fn nodes(&self) -> &Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> {
         &self.nodes
     }
@@ -267,11 +271,36 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
 
 /// Manages the whole simulation throughout its lifetime.
 pub struct SimManager<A: Coord<K>, const K: usize, C: SimConfig<A, K>> {
-    /// Stores the state of the current tick
+    /// Stores the state of the current tick.
     pub global_state_manager: GlobalStateManager<A, K, C>,
 }
 
 impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
+    /// # Arguments
+    ///
+    /// * `nodes`: Nodes that will be simulated.
+    /// * `seed`: Seed used for randomness, ensure it's the same between runs you want to be reproducible!
+    /// * `propagation_model`: Propagation model that the sim uses to check whether a packet transmission should be received.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    ///
+    /// struct TestConfig;
+    /// impl SimConfig<f32, 2> for TestConfig {
+    ///     // In this simulation nodes won't move
+    ///     type MB = StaticMovement;
+    ///     // Nodes use the builtin Monotonic behaviour which broadcasts new packets every N ticks.
+    ///     // We use Monotonic to wrap our existing behaviour.
+    ///     type NB = Monotonic<f32, 2, Flood<f32, 2>, FloodPacket, FreeSpaceParams<f32, 2>>;
+    ///     // We're going to use the Friis transmission equation here as our propagation model.
+    ///     type PM = FreeSpace;
+    ///     type S = OurStatKey;
+    ///     type E = OurEventType;
+    /// }
+    ///
+    /// let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, FreeSpace);
+    /// ```
     pub fn new(
         nodes: Vec<NodeInit<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>>,
         seed: u64,
