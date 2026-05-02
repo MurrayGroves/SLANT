@@ -1,8 +1,5 @@
 //! Structs that manage the simulation and its state.
 use crate::behaviours::NodeBehaviour;
-use crate::builtin::move_behaviours::static_movement::StaticMovement;
-use crate::builtin::node_behaviours::monotonic::Monotonic;
-use crate::builtin::propagation_models::free_space::{FreeSpace, FreeSpaceParams};
 use crate::node::{Node, NodeData, NodeID, NodeInit};
 use crate::packets::Packet;
 use crate::propagation_models::{PropagationModel, PropagationParams};
