@@ -31,3 +31,7 @@ disable_internal_events = []
 [[example]]
 path = "examples/flood.rs"
 name = "flood"
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true

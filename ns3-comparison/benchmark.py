@@ -15,7 +15,8 @@ def get_ns3_time(text: str) -> float:
 def get_manetsim_time(text: str) -> float:
     lines = text.splitlines()
     for line in lines:
-        if line.startswith("Simulation took"):
+        if "Simulation took" in line:
+            print("Found line {line}")
             time = float(line.split(" ")[-1].replace("s", ""))
             if time != 0:
                 return time

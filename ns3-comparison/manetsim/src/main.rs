@@ -227,5 +227,5 @@ fn main() {
 
     info!("Received {} packets total", received_packets);
     info!("Originated {} packets total", originated_packets);
-    info!("Simulation took {}", start.elapsed().as_secs_f64());
+    info!("Simulation took {}s", start.elapsed().as_secs_f64());
 }
