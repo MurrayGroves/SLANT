@@ -2,6 +2,11 @@
 name = "slant"
 version = "0.1.0"
 edition = "2024"
+description = "Simulator for Large Ad hoc Network Topologies"
+repository = "https://code.murraygrov.es/MurrayGroves/SLANT"
+license-file = "LICENSE.md"
+keywords = ["simulator", "manet", "network"]
+categories = ["simulation"]
 
 [lib]
 name = "slant"
