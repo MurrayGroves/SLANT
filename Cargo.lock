@@ -1591,7 +1591,7 @@ dependencies = [
  "az",
  "env_logger",
  "log",
- "manetsim",
+ "slant",
 ]
 
 [[package]]
@@ -3068,38 +3068,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "manetsim"
-version = "0.1.0"
-dependencies = [
- "az",
- "env_logger",
- "kiddo",
- "lazy_static",
- "linearize",
- "log",
- "num-traits",
- "rand 0.10.0",
- "rand_xoshiro",
- "rayon",
- "serde",
- "take_mut",
- "thread_local",
-]
-
-[[package]]
-name = "manetsim-gui"
-version = "0.0.0"
-dependencies = [
- "az",
- "env_logger",
- "libcosmic",
- "log",
- "manetsim",
- "num-traits",
- "tokio",
-]
-
-[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4563,6 +4531,38 @@ name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
+
+[[package]]
+name = "slant"
+version = "0.1.0"
+dependencies = [
+ "az",
+ "env_logger",
+ "kiddo",
+ "lazy_static",
+ "linearize",
+ "log",
+ "num-traits",
+ "rand 0.10.0",
+ "rand_xoshiro",
+ "rayon",
+ "serde",
+ "take_mut",
+ "thread_local",
+]
+
+[[package]]
+name = "slant-gui"
+version = "0.0.0"
+dependencies = [
+ "az",
+ "env_logger",
+ "libcosmic",
+ "log",
+ "num-traits",
+ "slant",
+ "tokio",
+]
 
 [[package]]
 name = "slotmap"

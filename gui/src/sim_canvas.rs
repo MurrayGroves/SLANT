@@ -8,11 +8,11 @@ use cosmic::widget::canvas::path::lyon_path::geom::Angle;
 use cosmic::widget::canvas::path::lyon_path::geom::euclid::{Transform2D, Vector2D};
 use cosmic::widget::canvas::{Cache, Frame, Program, Stroke};
 use log::debug;
-use manetsim::builtin::propagation_models::simple_distance::SimpleDistanceParams;
-use manetsim::node::NodeData;
-use manetsim::stats::InternalEvent;
-use manetsim::stats::InternalEvent::PacketLink;
 use num_traits::float::Float;
+use slant::builtin::propagation_models::simple_distance::SimpleDistanceParams;
+use slant::node::NodeData;
+use slant::stats::InternalEvent;
+use slant::stats::InternalEvent::PacketLink;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["lib", "gui", "ns3-comparison/manetsim"]
+members = ["lib", "gui", "ns3-comparison/slant"]
 
 [profile.release-with-debug]
 inherits = "release"

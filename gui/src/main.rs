@@ -14,15 +14,13 @@ use cosmic::prelude::*;
 use cosmic::widget::{Canvas, canvas, container};
 use cosmic::{Core, iced, widget};
 use log::{debug, info};
-use manetsim::SimConfig;
-use manetsim::builtin::move_behaviours::random_walk::RandomWalk;
-use manetsim::builtin::node_behaviours::flood::Flood;
-use manetsim::builtin::propagation_models::simple_distance::{
-    SimpleDistance, SimpleDistanceParams,
-};
-use manetsim::managers::SimManager;
-use manetsim::node::NodeData;
-use manetsim::stats::InternalEvent;
+use slant::SimConfig;
+use slant::builtin::move_behaviours::random_walk::RandomWalk;
+use slant::builtin::node_behaviours::flood::Flood;
+use slant::builtin::propagation_models::simple_distance::{SimpleDistance, SimpleDistanceParams};
+use slant::managers::SimManager;
+use slant::node::NodeData;
+use slant::stats::InternalEvent;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -31,7 +29,7 @@ use tokio::time::{Instant, sleep};
 
 struct App {
     core: cosmic::Core,
-    sim: Arc<RwLock<manetsim::managers::SimManager<f32, 2, SimConf>>>,
+    sim: Arc<RwLock<slant::managers::SimManager<f32, 2, SimConf>>>,
     sim_canvas: SimCanvas,
     status_text: String,
     tick: usize,
@@ -67,7 +65,7 @@ impl cosmic::Application for App {
     type Flags = ();
     type Message = Message;
 
-    const APP_ID: &str = "dev.murrax.manetsim";
+    const APP_ID: &str = "dev.murrax.slant";
 
     fn core(&self) -> &cosmic::Core {
         &self.core
@@ -108,7 +106,7 @@ impl cosmic::Application for App {
             delay: true,
         };
 
-        let command = app.set_window_title("Manetsim".to_string(), iced::window::Id::unique());
+        let command = app.set_window_title("SLANT".to_string(), iced::window::Id::unique());
         (app, command)
     }
 

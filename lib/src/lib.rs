@@ -1,4 +1,4 @@
-//! Manetsim is a high performance network simulation library targeted at MANETs.
+//! SLANT (Simulator for Large Ad hoc Network Topologies) is a high performance network simulation library targeted at MANETs.
 //! You provide the behaviours and the library handles all the complicated orchestration and state management.
 //!
 //! # Behaviours and packets

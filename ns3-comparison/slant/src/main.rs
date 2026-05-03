@@ -1,14 +1,14 @@
 use log::info;
-use manetsim::behaviours::{MoveBehaviour, NodeBehaviour};
-use manetsim::builtin::move_behaviours::static_movement::StaticMovement;
-use manetsim::builtin::node_behaviours::monotonic::Monotonic;
-use manetsim::builtin::propagation_models::free_space::{FreeSpace, FreeSpaceParams};
-use manetsim::managers::{GlobalStateManager, SimManager};
-use manetsim::node::{NodeData, NodeID, NodeInit};
-use manetsim::packets::{GloballySequencedPacket, Packet};
-use manetsim::propagation_models::{PropagationModel, PropagationParams};
-use manetsim::stats::InternalStatKey;
-use manetsim::{Coord, SimConfig};
+use slant::behaviours::{MoveBehaviour, NodeBehaviour};
+use slant::builtin::move_behaviours::static_movement::StaticMovement;
+use slant::builtin::node_behaviours::monotonic::Monotonic;
+use slant::builtin::propagation_models::free_space::{FreeSpace, FreeSpaceParams};
+use slant::managers::{GlobalStateManager, SimManager};
+use slant::node::{NodeData, NodeID, NodeInit};
+use slant::packets::{GloballySequencedPacket, Packet};
+use slant::propagation_models::{PropagationModel, PropagationParams};
+use slant::stats::InternalStatKey;
+use slant::{Coord, SimConfig};
 use std::collections::HashSet;
 use std::env;
 use std::fmt::Debug;
@@ -35,11 +35,11 @@ where
 
     fn tick<
         C: SimConfig<
-                A,
-                K,
-                PM = impl PropagationModel<A, K, P = PP>,
-                NB = impl NodeBehaviour<A, K, PP, P = Self::P>,
-            >,
+            A,
+            K,
+            PM = impl PropagationModel<A, K, P = PP>,
+            NB = impl NodeBehaviour<A, K, PP, P = Self::P>,
+        >,
     >(
         mut self,
         node_data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,

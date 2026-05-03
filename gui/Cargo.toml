@@ -1,10 +1,10 @@
 [package]
-name = "manetsim-gui"
+name = "slant-gui"
 edition = "2024"
 
 [dependencies]
 libcosmic = { git = "https://github.com/pop-os/libcosmic.git", features = ["wgpu"] }
-manetsim = { path = "../lib" }
+slant = { path = "../lib" }
 az = "1.3.0"
 log = { version = "0.4.29", features = ["release_max_level_info"] }
 num-traits = "0.2.19"
@@ -12,5 +12,5 @@ tokio = "*"
 env_logger = "*"
 
 [[bin]]
-name = "manetsim-gui"
+name = "slant-gui"
 path = "src/main.rs"
