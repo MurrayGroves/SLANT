@@ -11,7 +11,7 @@
 //! Node behaviours receive a list of all packets the node received in a previous frame and may do whatever processing on them is desired (including modifying the node's state), and can transmit new packets out into the network.
 //!
 //! You'll likely define your node behaviours to work with a specific packet type so that your packets can store whatever information is needed for your behaviours.
-//! Packets can carry whatever data you like, they just need to define a [couple methods] from the [Packet] trait to allow the simulation to optimise their delivery.
+//! Packets can carry whatever data you like, they just need to define a couple methods from the [packets::Packet] trait to allow the simulation to optimise their delivery.
 //!
 //! # Propagation Models
 //! [Propagation models](PropagationModel) are responsible for deciding which nodes receive transmitted packets.
