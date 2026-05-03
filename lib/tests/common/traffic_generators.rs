@@ -7,6 +7,7 @@ use manetsim::node::NodeID;
 use manetsim::propagation_models::PropagationModel;
 use manetsim::{Coord, SimConfig};
 use rand::RngExt;
+use std::sync::Arc;
 
 /// Generates a certain number of [UnicastPacket]s and a certain number of [MulticastPacket]s and transmits them from random nodes in the network.
 pub fn mixed_multicast_and_random_target_unicast<
@@ -33,7 +34,7 @@ pub fn mixed_multicast_and_random_target_unicast<
         let mut bytes: [u8; 32] = [0; 32];
         rng.fill(&mut bytes);
         let packet = MulticastPacket {
-            content: Box::new(bytes),
+            content: Arc::new(Box::new(bytes)),
         };
         global_state_manager.transmit_packet(
             &global_state_manager.nodes()[index].data(),
@@ -47,7 +48,7 @@ pub fn mixed_multicast_and_random_target_unicast<
         let mut bytes: [u8; 32] = [0; 32];
         rng.fill(&mut bytes);
         let packet = UnicastPacket {
-            content: Box::new(bytes),
+            content: Arc::new(Box::new(bytes)),
             target: target_id,
         };
         global_state_manager.transmit_packet(

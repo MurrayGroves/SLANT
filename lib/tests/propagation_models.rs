@@ -63,15 +63,15 @@ fn free_space() {
 
     #[derive(Clone, Debug)]
     struct MulticastTestPacket {
-        content: Box<[u8]>,
+        content: Arc<Box<[u8]>>,
     };
 
     impl Packet for MulticastTestPacket {
-        fn content(self) -> Box<[u8]> {
+        fn content(self) -> Arc<Box<[u8]>> {
             self.content
         }
 
-        fn content_ref(&self) -> &Box<[u8]> {
+        fn content_ref(&self) -> &Arc<Box<[u8]>> {
             &self.content
         }
 

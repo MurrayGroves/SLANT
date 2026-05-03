@@ -21,15 +21,15 @@ pub struct TestPacket {
     hops: u8,
     seq: u16,
     src: NodeID,
-    content: Box<[u8]>,
+    content: Arc<Box<[u8]>>,
 }
 
 impl Packet for TestPacket {
-    fn content(self) -> Box<[u8]> {
+    fn content(self) -> Arc<Box<[u8]>> {
         self.content
     }
 
-    fn content_ref(&self) -> &Box<[u8]> {
+    fn content_ref(&self) -> &Arc<Box<[u8]>> {
         &self.content
     }
 
@@ -76,7 +76,7 @@ impl FloodPacket for TestPacket {
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
         hops: Self::H,
         seq: Self::S,
-        content: Box<[u8]>,
+        content: Arc<Box<[u8]>>,
     ) -> Self {
         Self {
             hops,
@@ -90,7 +90,7 @@ impl FloodPacket for TestPacket {
 #[derive(Clone)]
 pub struct Monotonic<A: Coord<K>, const K: usize, P: Packet + Clone, PP: PropagationParams<A, K>> {
     packet_type: PhantomData<P>,
-    gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
+    gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Arc<Box<[u8]>>) -> P + Send + Sync>,
 }
 
 impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet + Clone>
@@ -98,7 +98,9 @@ impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet + Clone
 {
     const CHANCE: f32 = 0.0002;
 
-    pub fn new(gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>) -> Self {
+    pub fn new(
+        gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Arc<Box<[u8]>>) -> P + Send + Sync>,
+    ) -> Self {
         Monotonic {
             packet_type: Default::default(),
             gen_packet,
@@ -137,7 +139,7 @@ impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: GloballySequen
         if rand < Self::CHANCE {
             global_state_manager.transmit_packet(
                 node_data,
-                (self.gen_packet)(node_data, Box::new(node_data.id.to_be_bytes())),
+                (self.gen_packet)(node_data, Arc::new(Box::new(node_data.id.to_be_bytes()))),
             )
         }
 
@@ -165,7 +167,7 @@ pub trait FloodPacket: Packet + GloballySequencedPacket + Clone {
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
         hops: Self::H,
         seq: Self::S,
-        content: Box<[u8]>,
+        content: Arc<Box<[u8]>>,
     ) -> Self;
 }
 
@@ -239,7 +241,7 @@ impl<PT: FloodPacket + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
     pub fn gen_packet(
         &self,
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
-        content: Box<[u8]>,
+        content: Arc<Box<[u8]>>,
     ) -> PT {
         let mut seq = self.seq.lock().unwrap();
         let packet = PT::new(

@@ -10,6 +10,7 @@ use num_traits::{Num, NumCast, One, Zero};
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 /// Implements the flooding protocol.
 /// New packets have a set hop count. Upon receiving a packet, a node will check if the hop count is above zero. If it is, it will decrement it and rebroadcast the packet.
@@ -40,7 +41,7 @@ pub trait FloodPacket: Packet + GloballySequencedPacket + Clone {
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
         hops: Self::H,
         seq: Self::S,
-        content: Box<[u8]>,
+        content: Arc<Box<[u8]>>,
     ) -> Self;
 }
 
@@ -109,7 +110,7 @@ impl<PT: FloodPacket + Clone, A: Coord<K>, const K: usize> Flood<PT, A, K> {
     pub fn gen_packet(
         &mut self,
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
-        content: Box<[u8]>,
+        content: Arc<Box<[u8]>>,
     ) -> PT {
         let packet = PT::new(
             data,

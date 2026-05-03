@@ -4,6 +4,7 @@ use crate::node::{NodeData, NodeID};
 use crate::packets::Packet;
 use crate::propagation_models::PropagationParams;
 use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 
 /// A packet which can only be received by a specific node
 #[derive(Clone)]
@@ -11,15 +12,15 @@ pub struct UnicastPacket {
     /// The node which can receive this packet.
     pub target: NodeID,
     /// The bytes content of the packet.
-    pub content: Box<[u8]>,
+    pub content: Arc<Box<[u8]>>,
 }
 
 impl Packet for UnicastPacket {
-    fn content(self) -> Box<[u8]> {
+    fn content(self) -> Arc<Box<[u8]>> {
         self.content
     }
 
-    fn content_ref(&self) -> &Box<[u8]> {
+    fn content_ref(&self) -> &Arc<Box<[u8]>> {
         &self.content
     }
 

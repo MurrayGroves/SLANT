@@ -6,14 +6,15 @@ use num_traits::Num;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::AddAssign;
+use std::sync::Arc;
 
 /// A packet which can be received by nodes in the network
 pub trait Packet: Debug + Send + Sync + Clone {
     /// Should return the bytes content of the packet.
-    fn content(self) -> Box<[u8]>;
+    fn content(self) -> Arc<Box<[u8]>>;
 
     /// Should borrow the bytes content of the packet.
-    fn content_ref(&self) -> &Box<[u8]>;
+    fn content_ref(&self) -> &Arc<Box<[u8]>>;
 
     /// Returns a vec of all NodeIDs which could receive the packet if they are in range.
     /// Means the transmitter can avoid having to look up all nodes in range.

@@ -4,20 +4,21 @@ use crate::node::{NodeData, NodeID};
 use crate::packets::Packet;
 use crate::propagation_models::PropagationParams;
 use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 
 /// A packet which can be received by any node.
 #[derive(Clone)]
 pub struct MulticastPacket {
     /// Bytes content of packet.
-    pub content: Box<[u8]>,
+    pub content: Arc<Box<[u8]>>,
 }
 
 impl Packet for MulticastPacket {
-    fn content(self) -> Box<[u8]> {
+    fn content(self) -> Arc<Box<[u8]>> {
         self.content
     }
 
-    fn content_ref(&self) -> &Box<[u8]> {
+    fn content_ref(&self) -> &Arc<Box<[u8]>> {
         &self.content
     }
 

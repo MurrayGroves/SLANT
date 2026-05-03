@@ -132,15 +132,15 @@ fn random_walk_scale_test() {
         hops: u8,
         seq: u16,
         src: NodeID,
-        content: Box<[u8]>,
+        content: Arc<Box<[u8]>>,
     }
 
     impl Packet for TestPacket {
-        fn content(self) -> Box<[u8]> {
+        fn content(self) -> Arc<Box<[u8]>> {
             self.content
         }
 
-        fn content_ref(&self) -> &Box<[u8]> {
+        fn content_ref(&self) -> &Arc<Box<[u8]>> {
             &self.content
         }
 
@@ -187,7 +187,7 @@ fn random_walk_scale_test() {
             data: &NodeData<A, K, impl PropagationParams<A, K>>,
             hops: Self::H,
             seq: Self::S,
-            content: Box<[u8]>,
+            content: Arc<Box<[u8]>>,
         ) -> Self {
             Self {
                 hops,

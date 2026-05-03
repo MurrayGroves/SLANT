@@ -24,7 +24,7 @@ pub struct Monotonic<
     /// E.g. with a value of `5` a packet will be generated every 5th tick.
     pub ticks_per_packet: usize,
     counter: usize,
-    gen_packet: Arc<dyn Fn(&mut T, &NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
+    gen_packet: Arc<dyn Fn(&mut T, &NodeData<A, K, PP>, Arc<Box<[u8]>>) -> P + Send + Sync>,
     /// The contained behaviour which is ticked by Monotonic.
     pub contained: T,
 }
@@ -45,7 +45,7 @@ impl<
     pub fn new(
         contained: T,
         ticks_per_packet: usize,
-        gen_packet: Arc<dyn Fn(&mut T, &NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
+        gen_packet: Arc<dyn Fn(&mut T, &NodeData<A, K, PP>, Arc<Box<[u8]>>) -> P + Send + Sync>,
     ) -> Self {
         Monotonic {
             ticks_per_packet,
@@ -92,7 +92,7 @@ impl<
                 (self.gen_packet)(
                     &mut self.contained,
                     node_data,
-                    Box::new(node_data.id.to_be_bytes()),
+                    Arc::new(Box::new(node_data.id.to_be_bytes())),
                 ),
             )
         }

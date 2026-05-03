@@ -76,7 +76,7 @@ impl<A: Coord<K>, const K: usize> Flood<A, K> {
     pub fn gen_packet(
         &mut self,
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
-        content: Box<[u8]>,
+        content: Arc<Box<[u8]>>,
     ) -> FloodPacket {
         let packet = FloodPacket::new(data, self.hop_count, self.seq, content);
         self.seq += 1;
@@ -98,15 +98,15 @@ pub struct FloodPacket {
     /// We encode the source address so that we can generate a globally unique seq from it and the packet's local seq number
     src: NodeID,
     /// All packets must store some data
-    content: Box<[u8]>,
+    content: Arc<Box<[u8]>>,
 }
 
 impl Packet for FloodPacket {
-    fn content(self) -> Box<[u8]> {
+    fn content(self) -> Arc<Box<[u8]>> {
         self.content
     }
 
-    fn content_ref(&self) -> &Box<[u8]> {
+    fn content_ref(&self) -> &Arc<Box<[u8]>> {
         &self.content
     }
 
@@ -152,7 +152,7 @@ impl FloodPacket {
         data: &NodeData<A, K, impl PropagationParams<A, K>>,
         hops: u8,
         seq: u16,
-        content: Box<[u8]>,
+        content: Arc<Box<[u8]>>,
     ) -> Self {
         Self {
             hops,

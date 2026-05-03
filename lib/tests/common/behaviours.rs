@@ -16,7 +16,7 @@ pub struct Monotonic<A: Coord<K>, const K: usize, P: Packet + Clone, PP: Propaga
     pub ticks_per_packet: usize,
     counter: usize,
     pub received_packets: usize,
-    gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
+    gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Arc<Box<[u8]>>) -> P + Send + Sync>,
 }
 
 impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet + Clone>
@@ -24,7 +24,7 @@ impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet + Clone
 {
     pub fn new(
         ticks_per_packet: usize,
-        gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Box<[u8]>) -> P + Send + Sync>,
+        gen_packet: Arc<dyn Fn(&NodeData<A, K, PP>, Arc<Box<[u8]>>) -> P + Send + Sync>,
     ) -> Self {
         Monotonic {
             packet_type: Default::default(),
@@ -65,7 +65,7 @@ impl<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>, P: Packet + Clone
         if self.counter % self.ticks_per_packet == 0 {
             global_state_manager.transmit_packet(
                 node_data,
-                (self.gen_packet)(node_data, Box::new(node_data.id.to_be_bytes())),
+                (self.gen_packet)(node_data, Arc::new(Box::new(node_data.id.to_be_bytes()))),
             )
         }
 

@@ -1,10 +1,12 @@
 //! A packet which can be either multicast or unicast.
+
 use crate::Coord;
 use crate::builtin::packets::multicast::MulticastPacket;
 use crate::builtin::packets::unicast::UnicastPacket;
 use crate::node::{NodeData, NodeID};
 use crate::packets::Packet;
 use crate::propagation_models::PropagationParams;
+use std::sync::Arc;
 
 /// A packet which can be either multicast or unicast
 #[derive(Clone, Debug)]
@@ -16,14 +18,14 @@ pub enum MulticastOrUnicast {
 }
 
 impl Packet for MulticastOrUnicast {
-    fn content(self) -> Box<[u8]> {
+    fn content(self) -> Arc<Box<[u8]>> {
         match self {
             MulticastOrUnicast::MulticastPacket(p) => p.content(),
             MulticastOrUnicast::UnicastPacket(p) => p.content(),
         }
     }
 
-    fn content_ref(&self) -> &Box<[u8]> {
+    fn content_ref(&self) -> &Arc<Box<[u8]>> {
         match self {
             MulticastOrUnicast::MulticastPacket(p) => p.content_ref(),
             MulticastOrUnicast::UnicastPacket(p) => p.content_ref(),
