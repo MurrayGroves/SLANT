@@ -1,12 +1,12 @@
-use manetsim::behaviours::NodeBehaviour;
-use manetsim::builtin::packets::multicast::MulticastPacket;
-use manetsim::builtin::packets::multicast_or_unicast::MulticastOrUnicast;
-use manetsim::builtin::packets::unicast::UnicastPacket;
-use manetsim::managers::GlobalStateManager;
-use manetsim::node::NodeID;
-use manetsim::propagation_models::PropagationModel;
-use manetsim::{Coord, SimConfig};
 use rand::RngExt;
+use slant::behaviours::NodeBehaviour;
+use slant::builtin::packets::multicast::MulticastPacket;
+use slant::builtin::packets::multicast_or_unicast::MulticastOrUnicast;
+use slant::builtin::packets::unicast::UnicastPacket;
+use slant::managers::GlobalStateManager;
+use slant::node::NodeID;
+use slant::propagation_models::PropagationModel;
+use slant::{Coord, SimConfig};
 use std::sync::Arc;
 
 /// Generates a certain number of [UnicastPacket]s and a certain number of [MulticastPacket]s and transmits them from random nodes in the network.

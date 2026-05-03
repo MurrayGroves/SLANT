@@ -1,12 +1,12 @@
 use lazy_static::lazy_static;
 use log::trace;
-use manetsim::behaviours::{MoveBehaviour, NodeBehaviour};
-use manetsim::builtin::packets::multicast_or_unicast::MulticastOrUnicast;
-use manetsim::managers::GlobalStateManager;
-use manetsim::node::NodeData;
-use manetsim::packets::Packet;
-use manetsim::propagation_models::{PropagationModel, PropagationParams};
-use manetsim::{Coord, SimConfig};
+use slant::behaviours::{MoveBehaviour, NodeBehaviour};
+use slant::builtin::packets::multicast_or_unicast::MulticastOrUnicast;
+use slant::managers::GlobalStateManager;
+use slant::node::NodeData;
+use slant::packets::Packet;
+use slant::propagation_models::{PropagationModel, PropagationParams};
+use slant::{Coord, SimConfig};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 

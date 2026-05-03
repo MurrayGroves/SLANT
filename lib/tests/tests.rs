@@ -2,21 +2,20 @@ mod common;
 
 use common::behaviours::{LoggerNode, packet_counter};
 use common::traffic_generators::mixed_multicast_and_random_target_unicast;
-use log::trace;
-use manetsim::behaviours::MoveBehaviour;
-use manetsim::builtin::move_behaviours::random_walk::RandomWalk;
-use manetsim::builtin::node_behaviours::flood::{Flood, FloodPacket};
-use manetsim::builtin::node_behaviours::monotonic::Monotonic;
-use manetsim::builtin::propagation_models::simple_distance::{
-    SimpleDistance, SimpleDistanceParams,
-};
-use manetsim::managers::SimManager;
-use manetsim::node::{NodeData, NodeID, NodeInit};
-use manetsim::packets::{GloballySequencedPacket, Packet};
-use manetsim::propagation_models::PropagationParams;
-use manetsim::{Coord, SimConfig};
+use log::{info, trace};
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
+use slant::behaviours::MoveBehaviour;
+use slant::builtin::move_behaviours::random_walk::RandomWalk;
+use slant::builtin::node_behaviours::flood::{Flood, FloodPacket};
+use slant::builtin::node_behaviours::monotonic::Monotonic;
+use slant::builtin::propagation_models::simple_distance::{SimpleDistance, SimpleDistanceParams};
+use slant::managers::SimManager;
+use slant::node::{NodeData, NodeID, NodeInit};
+use slant::packets::{GloballySequencedPacket, Packet};
+use slant::propagation_models::PropagationParams;
+use slant::stats::InternalStatKey;
+use slant::{Coord, SimConfig};
 use std::env;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
@@ -121,7 +120,7 @@ fn ten_ticks_random_walk() {
 }
 #[test]
 fn random_walk_scale_test() {
-    //env_logger::init();
+    env_logger::init();
 
     let num_nodes = env::var("NUM_NODES")
         .unwrap_or("1024".into())
@@ -245,5 +244,11 @@ fn random_walk_scale_test() {
 
     let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, SimpleDistance);
 
-    sim.n_ticks(100);
+    let stats = sim.n_ticks(100);
+    let packets = stats
+        .into_iter()
+        .map(|mut x| x.internal_stats()[InternalStatKey::PacketReceives])
+        .reduce(std::ops::Add::add)
+        .unwrap_or_default();
+    info!("Received {} packets total", packets);
 }

@@ -1,12 +1,12 @@
 mod common;
 
 use common::behaviours::{Monotonic, StaticMovement};
-use manetsim::builtin::propagation_models::free_space::{FreeSpace, FreeSpaceParams};
-use manetsim::managers::SimManager;
-use manetsim::node::{NodeData, NodeID, NodeInit};
-use manetsim::packets::Packet;
-use manetsim::propagation_models::PropagationParams;
-use manetsim::{Coord, SimConfig};
+use slant::builtin::propagation_models::free_space::{FreeSpace, FreeSpaceParams};
+use slant::managers::SimManager;
+use slant::node::{NodeData, NodeID, NodeInit};
+use slant::packets::Packet;
+use slant::propagation_models::PropagationParams;
+use slant::{Coord, SimConfig};
 use std::sync::Arc;
 
 #[test]
