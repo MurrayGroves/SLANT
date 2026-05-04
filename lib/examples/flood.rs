@@ -169,7 +169,7 @@ fn generate_nodes<MB: MoveBehaviour<f32, 2>, P: PropagationParams<f32, 2>>(
     gap: f32,
     params: P,
     move_behaviour: MB,
-) -> Vec<NodeInit<Monotonic<f32, 2, Flood<f32, 2>, FloodPacket, P>, MB, P, f32, 2>> {
+) -> Vec<NodeInit<Monotonic<f32, 2, Flood<f32, 2>, P>, MB, P, f32, 2>> {
     let dim = num_nodes.isqrt();
     let mut nodes = Vec::with_capacity(num_nodes);
     for i in 0..num_nodes {
@@ -178,7 +178,7 @@ fn generate_nodes<MB: MoveBehaviour<f32, 2>, P: PropagationParams<f32, 2>>(
             starting_position: xy,
             node_behaviour: Monotonic::new(
                 Flood::new(5),
-                5,
+                5.0,
                 // This closure is used by Monotonic to generate new packets.
                 Arc::new(|flood, data, contents| {
                     let seq = flood.seq;
@@ -207,7 +207,7 @@ fn main() {
         type MB = StaticMovement;
         // Nodes use the builtin Monotonic behaviour which broadcasts new packets every N ticks.
         // We use Monotonic to wrap our existing behaviour.
-        type NB = Monotonic<f32, 2, Flood<f32, 2>, FloodPacket, FreeSpaceParams<f32, 2>>;
+        type NB = Monotonic<f32, 2, Flood<f32, 2>, FreeSpaceParams<f32, 2>>;
         // We're going to use the Friis transmission equation here as our propagation model.
         type PM = FreeSpace;
     }
@@ -227,7 +227,7 @@ fn main() {
     );
 
     // We define a new simulation using our configuration.
-    let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, FreeSpace);
+    let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, FreeSpace, 1.0);
 
     // n_ticks returns a vector of stats for each timestep.
     let stats = sim.n_ticks(10);

@@ -100,7 +100,7 @@ fn free_space() {
     }
 
     let mut sim_manager: SimManager<f32, 2, TestSimConfig> =
-        SimManager::new(nodes, 2138717, FreeSpace);
+        SimManager::new(nodes, 2138717, FreeSpace, 1.0);
 
     sim_manager.n_ticks(11);
 

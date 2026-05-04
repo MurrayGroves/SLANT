@@ -35,11 +35,11 @@ where
 
     fn tick<
         C: SimConfig<
-            A,
-            K,
-            PM = impl PropagationModel<A, K, P = PP>,
-            NB = impl NodeBehaviour<A, K, PP, P = Self::P>,
-        >,
+                A,
+                K,
+                PM = impl PropagationModel<A, K, P = PP>,
+                NB = impl NodeBehaviour<A, K, PP, P = Self::P>,
+            >,
     >(
         mut self,
         node_data: &NodeData<A, K, <C::PM as PropagationModel<A, K>>::P>,
@@ -156,7 +156,7 @@ fn generate_nodes<MB: MoveBehaviour<f32, 2>, P: PropagationParams<f32, 2>>(
     gap: f32,
     params: P,
     move_behaviour: MB,
-) -> Vec<NodeInit<Monotonic<f32, 2, Flood<f32, 2>, FloodPacket, P>, MB, P, f32, 2>> {
+) -> Vec<NodeInit<Monotonic<f32, 2, Flood<f32, 2>, P>, MB, P, f32, 2>> {
     let dim = num_nodes.isqrt();
     let mut nodes = Vec::with_capacity(num_nodes);
     for i in 0..num_nodes {
@@ -165,7 +165,7 @@ fn generate_nodes<MB: MoveBehaviour<f32, 2>, P: PropagationParams<f32, 2>>(
             starting_position: xy,
             node_behaviour: Monotonic::new(
                 Flood::new(5),
-                5,
+                5.0,
                 Arc::new(|flood, data, contents| {
                     let seq = flood.seq;
                     flood.seq += 1;
@@ -206,11 +206,11 @@ fn main() {
     struct TestConfig;
     impl SimConfig<f32, 2> for TestConfig {
         type MB = StaticMovement;
-        type NB = Monotonic<f32, 2, Flood<f32, 2>, FloodPacket, FreeSpaceParams<f32, 2>>;
+        type NB = Monotonic<f32, 2, Flood<f32, 2>, FreeSpaceParams<f32, 2>>;
         type PM = FreeSpace;
     }
 
-    let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, FreeSpace);
+    let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, FreeSpace, 1.0);
 
     let stats = sim.n_ticks(10);
 

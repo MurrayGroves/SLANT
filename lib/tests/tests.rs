@@ -1,5 +1,7 @@
 mod common;
 
+use crate::common::behaviours::StaticMovement;
+use crate::common::helpers::generate_cloned_nodes;
 use common::behaviours::{LoggerNode, packet_counter};
 use common::traffic_generators::mixed_multicast_and_random_target_unicast;
 use log::{info, trace};
@@ -7,8 +9,11 @@ use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256Plus;
 use slant::behaviours::MoveBehaviour;
 use slant::builtin::move_behaviours::random_walk::RandomWalk;
+use slant::builtin::node_behaviours::empty_behaviour::EmptyBehaviour;
 use slant::builtin::node_behaviours::flood::{Flood, FloodPacket};
 use slant::builtin::node_behaviours::monotonic::Monotonic;
+use slant::builtin::packets::multicast::MulticastPacket;
+use slant::builtin::packets::multicast_or_unicast::MulticastOrUnicast;
 use slant::builtin::propagation_models::simple_distance::{SimpleDistance, SimpleDistanceParams};
 use slant::managers::SimManager;
 use slant::node::{NodeData, NodeID, NodeInit};
@@ -21,86 +26,50 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
 #[test]
-fn ten_ticks_random_walk() {
-    env_logger::init();
-
+fn one_hundred_secs_random_walk() {
     let propagation_params = SimpleDistanceParams {
         transmit_distance: 1.0,
     };
 
     let prop_model = SimpleDistance;
 
-    let nodes: Vec<
-        NodeInit<LoggerNode, RandomWalk<2, f64, 2>, SimpleDistanceParams<f64, 2>, f64, 2>,
-    > = vec![
-        NodeInit {
-            starting_position: [0.0, 0.0],
-            node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new(1.0),
-            propagation_params: propagation_params.clone(),
-        },
-        NodeInit {
-            starting_position: [1.0, 0.0],
-            node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new(1.0),
-            propagation_params: propagation_params.clone(),
-        },
-        NodeInit {
-            starting_position: [1.0, 1.0],
-            node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new(1.0),
-            propagation_params: propagation_params.clone(),
-        },
-        NodeInit {
-            starting_position: [0.0, 1.0],
-            node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new(1.0),
-            propagation_params: propagation_params.clone(),
-        },
-        NodeInit {
-            starting_position: [1.0, 0.0],
-            node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new(1.0),
-            propagation_params: propagation_params.clone(),
-        },
-        NodeInit {
-            starting_position: [1.0, 5.0],
-            node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new(1.0),
-            propagation_params: propagation_params.clone(),
-        },
-        NodeInit {
-            starting_position: [1.0, 0.0],
-            node_behaviour: LoggerNode {},
-            move_behaviour: RandomWalk::new(1.0),
-            propagation_params,
-        },
-    ];
+    let nodes = generate_cloned_nodes(
+        8,
+        1.0,
+        propagation_params.clone(),
+        RandomWalk::new(0.1, 2.0),
+        Monotonic::new(
+            EmptyBehaviour::new(),
+            1.0,
+            Arc::new(|_, _, contents| {
+                MulticastOrUnicast::MulticastPacket(MulticastPacket { content: contents })
+            }),
+        ),
+    );
 
     struct TestSimConfig;
-    impl SimConfig<f64, 2> for TestSimConfig {
-        type MB = RandomWalk<2, f64, 2>;
-        type NB = LoggerNode;
+    impl SimConfig<f32, 2> for TestSimConfig {
+        type MB = RandomWalk<f32, 2>;
+        type NB =
+            Monotonic<f32, 2, EmptyBehaviour<MulticastOrUnicast>, SimpleDistanceParams<f32, 2>>;
         type PM = SimpleDistance;
-        type S = ();
-        type E = ();
     }
 
     let mut sim_manager: SimManager<_, _, TestSimConfig> =
-        SimManager::new(nodes.clone(), 123, prop_model);
-    let mut rng = Xoshiro256Plus::seed_from_u64(123456);
-    for _ in 0..10 {
-        mixed_multicast_and_random_target_unicast(
-            &mut rng,
-            &sim_manager.global_state_manager,
-            5,
-            5,
-        );
-        sim_manager.n_ticks(1);
+        SimManager::new(nodes.clone(), 123, prop_model, 0.1);
+
+    let stats = sim_manager.tick_time(100.0);
+
+    let mut packets_received = 0;
+    let mut packets_transmitted = 0;
+    for mut stat in stats {
+        let internal_stats = stat.internal_stats();
+        packets_transmitted += internal_stats[InternalStatKey::PacketTransmits];
+        packets_received += internal_stats[InternalStatKey::PacketReceives];
     }
 
-    let ctr = packet_counter.lock().unwrap();
-    assert_eq!(*ctr, 48);
+    assert_eq!(packets_transmitted, 800);
+    assert_eq!(packets_received, 926);
 
     assert!(
         sim_manager
@@ -202,8 +171,7 @@ fn random_walk_scale_test() {
         gap: f32,
         params: P,
         move_behaviour: MB,
-    ) -> Vec<NodeInit<Monotonic<f32, 2, Flood<TestPacket, f32, 2>, TestPacket, P>, MB, P, f32, 2>>
-    {
+    ) -> Vec<NodeInit<Monotonic<f32, 2, Flood<TestPacket, f32, 2>, P>, MB, P, f32, 2>> {
         let dim = num_nodes.isqrt();
         let mut nodes = Vec::with_capacity(num_nodes);
         for i in 0..num_nodes {
@@ -213,7 +181,7 @@ fn random_walk_scale_test() {
                 starting_position: xy,
                 node_behaviour: Monotonic::new(
                     Flood::new(5),
-                    5,
+                    5.0,
                     Arc::new(|flood, data, contents| flood.gen_packet(data, contents)),
                 ),
                 move_behaviour: move_behaviour.clone(),
@@ -229,20 +197,19 @@ fn random_walk_scale_test() {
         SimpleDistanceParams {
             transmit_distance: 4000.0,
         },
-        RandomWalk::new(1000.0),
+        RandomWalk::new(1000.0, 20.0),
     );
 
     struct TestConfig;
     impl SimConfig<f32, 2> for TestConfig {
-        type MB = RandomWalk<20, f32, 2>;
-        type NB =
-            Monotonic<f32, 2, Flood<TestPacket, f32, 2>, TestPacket, SimpleDistanceParams<f32, 2>>;
+        type MB = RandomWalk<f32, 2>;
+        type NB = Monotonic<f32, 2, Flood<TestPacket, f32, 2>, SimpleDistanceParams<f32, 2>>;
         type PM = SimpleDistance;
         type S = ();
         type E = ();
     }
 
-    let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, SimpleDistance);
+    let mut sim: SimManager<_, _, TestConfig> = SimManager::new(nodes, 123456, SimpleDistance, 1.0);
 
     let stats = sim.n_ticks(100);
     let packets = stats

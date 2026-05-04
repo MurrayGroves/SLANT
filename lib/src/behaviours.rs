@@ -33,6 +33,7 @@ pub trait NodeBehaviour<A: Coord<K>, const K: usize, PP: PropagationParams<A, K>
 }
 
 /// Describes a movement behaviour which is ticked each tick and returns a new position for a node.
+/// When calculating the new position, ensure you multiply any velocities by the timestep delta!
 pub trait MoveBehaviour<A: Coord<K>, const K: usize>: Sized + Send + Sync + Clone {
     /// Note that this returns a *new* instance of `Self`, that is you should not modify state, but instead return a new state.
     /// It does however consume an owned version of itself, so you may (and should) move instead of copying/cloning where possible.

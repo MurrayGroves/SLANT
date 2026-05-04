@@ -307,7 +307,7 @@ impl MonotonicFlood {
 pub fn generate_nodes(
     num_nodes: usize,
     gap: f32,
-) -> Vec<NodeInit<MonotonicFlood, RandomWalk<30, f32, 2>, SimpleDistanceParams<f32, 2>, f32, 2>> {
+) -> Vec<NodeInit<MonotonicFlood, RandomWalk<f32, 2>, SimpleDistanceParams<f32, 2>, f32, 2>> {
     let dim = num_nodes.isqrt();
     let mut nodes = Vec::with_capacity(num_nodes);
     for i in 0..num_nodes {
@@ -316,7 +316,7 @@ pub fn generate_nodes(
         nodes.push(NodeInit {
             starting_position: xy,
             node_behaviour: MonotonicFlood::new(15),
-            move_behaviour: RandomWalk::new(100.0),
+            move_behaviour: RandomWalk::new(100.0, 30.0),
             // propagation_params: FreeSpaceParams::new(
             //     8.0,
             //     0.34538301613, // 868mhz in metres
@@ -341,7 +341,7 @@ pub struct SeqPacketTransmit<S: Clone> {
 
 pub struct SimConf;
 impl SimConfig<f32, 2> for SimConf {
-    type MB = RandomWalk<30, f32, 2>;
+    type MB = RandomWalk<f32, 2>;
     type NB = MonotonicFlood;
     type PM = SimpleDistance;
     type S = ();

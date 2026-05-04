@@ -78,7 +78,7 @@ impl cosmic::Application for App {
     fn init(core: Core, flags: Self::Flags) -> (Self, cosmic::app::Task<Self::Message>) {
         let nodes = generate_nodes(4096, 3_000.0);
 
-        let sim: SimManager<_, _, SimConf> = SimManager::new(nodes, 123456, SimpleDistance);
+        let sim: SimManager<_, _, SimConf> = SimManager::new(nodes, 123456, SimpleDistance, 1.0);
         let mut app = App {
             core,
             sim_canvas: SimCanvas {
@@ -193,7 +193,7 @@ impl cosmic::Application for App {
                     let nodes = generate_nodes(4096, 3_000.0);
 
                     let sim: SimManager<_, _, SimConf> =
-                        SimManager::new(nodes, 123456, SimpleDistance);
+                        SimManager::new(nodes, 123456, SimpleDistance, 1.0);
                     self.sim = Arc::new(RwLock::new(sim));
                 }
                 // Spawn task to tick sim

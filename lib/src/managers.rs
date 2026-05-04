@@ -51,13 +51,30 @@ pub struct GlobalStateManager<A: Coord<K>, const K: usize, C: SimConfig<A, K>> {
 
     /// Thread-local stats
     stats: Arc<ThreadLocal<RefCell<TimestepStats<C::S, C::E>>>>,
+
+    /// The delta that [current_time] is increased by each tick.
+    timestep_delta: f64,
+
+    /// The current simulation time, may be fetched by behaviours using the getter.
+    current_time: f64,
+
+    /// The current simulation tick.
+    current_tick: usize,
+
+    /// The next simulation tick
+    next_tick: usize,
+
+    /// The next simulation time.
+    next_time: f64,
 }
 
 impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C> {
+    /// Used to create state at tick zero.
     fn new(
         nodes: Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>>,
         seed: u64,
         propagation_model: C::PM,
+        timestep_delta: f64,
     ) -> GlobalStateManager<A, K, C> {
         Self {
             tree: Arc::new(ImmutableKdTree::new_from_slice(
@@ -81,12 +98,40 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
             nodes: Arc::new(nodes),
             propagation_model,
             stats: Arc::new(ThreadLocal::new()),
+            timestep_delta,
+            current_time: 0.0,
+            current_tick: 0,
+            next_tick: 0,
+            next_time: 0.0,
         }
     }
 
     /// Borrow the internal node storage, useful for retrieving state from your behaviours.
     pub fn nodes(&self) -> &Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> {
         &self.nodes
+    }
+
+    /// Get the configured timestep delta.
+    pub fn timestep_delta(&self) -> f64 {
+        self.timestep_delta
+    }
+
+    /// Get the current simulation time in this tick.
+    /// Use this for scheduling events that should happen at the same simulation time regardless of the timestep delta.
+    pub fn current_time(&self) -> f64 {
+        self.current_time
+    }
+
+    /// Check if the current time value is the closest to a specific time.
+    /// Use this to run events at specific times.
+    pub fn is_time(&self, time: f64) -> bool {
+        (self.current_time - time).abs() < (self.timestep_delta / 2.0)
+    }
+
+    /// Get the current simulation tick number.
+    /// Use this if you want to run an event every X ticks, beware that this means changing the timestep delta will change your behaviour!
+    pub fn current_tick(&self) -> usize {
+        self.current_tick
     }
 
     /// Calling this will clear the internal stats buffer, so you can only call it once per tick!
@@ -109,6 +154,8 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
     pub(crate) fn tick(&mut self) -> TimestepStats<C::S, C::E> {
         debug!("Ticking with {:?} threads", rayon::current_num_threads());
         self.stats = Arc::new(ThreadLocal::new());
+        self.current_tick = self.next_tick;
+        self.current_time = self.next_time;
         let nodes: Vec<Node<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>> = (*self
             .nodes)
             .clone()
@@ -155,6 +202,9 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> GlobalStateManager<A, K, C
             (0..nodes.len()).map(|x| (x, Mutex::new(Vec::new()))),
         ));
         self.nodes = Arc::new(nodes);
+
+        self.next_time += self.timestep_delta;
+        self.next_tick += 1;
 
         self.consume_stats()
     }
@@ -278,6 +328,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
     /// * `nodes`: Nodes that will be simulated.
     /// * `seed`: Seed used for randomness, ensure it's the same between runs you want to be reproducible!
     /// * `propagation_model`: Propagation model that the sim uses to check whether a packet transmission should be received.
+    /// * `timestep_delta`: How far the simulation time advances each tick. Smaller numbers can be more accurate in exchange for longer runtime.
     ///
     /// # Examples
     ///
@@ -302,6 +353,7 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
         nodes: Vec<NodeInit<C::NB, C::MB, <C::PM as PropagationModel<A, K>>::P, A, K>>,
         seed: u64,
         propagation_model: C::PM,
+        timestep_delta: f64,
     ) -> Self {
         let nodes = nodes
             .into_iter()
@@ -321,7 +373,12 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
             .collect();
 
         Self {
-            global_state_manager: GlobalStateManager::new(nodes, seed, propagation_model),
+            global_state_manager: GlobalStateManager::new(
+                nodes,
+                seed,
+                propagation_model,
+                timestep_delta,
+            ),
         }
     }
 
@@ -338,5 +395,81 @@ impl<A: Coord<K>, const K: usize, C: SimConfig<A, K>> SimManager<A, K, C> {
     /// Perform one tick of the simulation, returning the stats generated during the tick.
     pub fn tick(&mut self) -> TimestepStats<C::S, C::E> {
         self.global_state_manager.tick()
+    }
+
+    /// Tick the simulation for a certain amount of simulation time.
+    /// The actual number of ticks performed depends on the set timestep delta.
+    pub fn tick_time(&mut self, time: f64) -> Vec<TimestepStats<C::S, C::E>> {
+        let end_time = self.global_state_manager.current_time + time;
+        let mut stats =
+            Vec::with_capacity((time / self.global_state_manager.timestep_delta).ceil() as usize);
+        while !self.global_state_manager.is_time(end_time) {
+            stats.push(self.global_state_manager.tick());
+        }
+        stats
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::builtin::move_behaviours::static_movement::StaticMovement;
+    use crate::builtin::node_behaviours::empty_behaviour::EmptyBehaviour;
+    use crate::builtin::propagation_models::simple_distance::SimpleDistance;
+    use crate::managers::SimManager;
+    use crate::node::{NodeData, NodeID};
+    use crate::packets::Packet;
+    use crate::propagation_models::PropagationParams;
+    use crate::{Coord, SimConfig};
+    use std::sync::Arc;
+
+    #[derive(Clone, Debug)]
+    struct EmptyPacket {
+        content: Arc<Box<[u8]>>,
+    }
+    impl Packet for EmptyPacket {
+        fn content(self) -> Arc<Box<[u8]>> {
+            self.content
+        }
+
+        fn content_ref(&self) -> &Arc<Box<[u8]>> {
+            &self.content
+        }
+
+        fn eager_targets(&self) -> Option<Vec<NodeID>> {
+            None
+        }
+
+        fn targets<A: Coord<K>, const K: usize, P: PropagationParams<A, K>>(
+            &self,
+            target: &NodeData<A, K, P>,
+        ) -> bool
+        where
+            Self: Sized,
+        {
+            true
+        }
+    }
+
+    struct EmptyConfig;
+    impl SimConfig<f32, 2> for EmptyConfig {
+        type MB = StaticMovement;
+        type NB = EmptyBehaviour<EmptyPacket>;
+        type PM = SimpleDistance;
+    }
+
+    #[test]
+    fn tick_time() {
+        let delta = 0.5;
+
+        let mut sim: SimManager<f32, 2, EmptyConfig> =
+            SimManager::new(vec![], 100, SimpleDistance, delta);
+
+        sim.tick_time(100.0);
+
+        assert_eq!(sim.global_state_manager.current_time, 100.0);
+        assert_eq!(
+            sim.global_state_manager.current_tick,
+            (100.0 / delta) as usize
+        );
     }
 }

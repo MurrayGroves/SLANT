@@ -1,6 +1,6 @@
 [package]
 name = "slant"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Simulator for Large Ad hoc Network Topologies"
 repository = "https://code.murraygrov.es/MurrayGroves/SLANT"
